@@ -1,0 +1,37 @@
+{"ts": 1760258265, "target": "192.168.73.101", "open_ports": ["3306/tcp"], "closed_ports": ["80/tcp", "8080/tcp", "2/tcp", "443/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\f\u0000\u0000\u0000\u0003\u0014\fK)\u0013B?\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000^R \f3\\\u0019d\u001d}\u0006\u0001\u0000caching_sha2_password\u0000"}}
+{"ts": 1760258291, "target": "192.168.73.101", "open_ports": [], "closed_ports": ["80/udp", "2/udp", "3306/udp", "443/udp", "8080/udp"]}
+{"ts": 1760258411, "target": "127.0.0.1", "open_ports": ["3306/tcp"], "closed_ports": ["443/tcp", "80/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u000e\u0000\u0000\u0000\u0003[B\u0013\u000b\n.\u0005\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000*UT\u001er\u001dNe\u0014\u0001Mr\u0000caching_sha2_password\u0000"}}
+{"ts": 1760258413, "target": "127.0.0.1", "open_ports": ["3306/tcp"], "closed_ports": ["80/tcp", "443/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u0012\u0000\u0000\u0000>7a1vxI?\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000*\rQa\rj0spMA\u0001\u0000caching_sha2_password\u0000"}}
+{"ts": 1760258413, "target": "127.0.0.2", "open_ports": ["3306/tcp"], "closed_ports": ["443/tcp", "80/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u0011\u0000\u0000\u0000%UzG\u0006#te\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\be\u0013\u001e#x.d)!mw\u0000caching_sha2_password\u0000"}}
+{"ts": 1760258416, "target": "192.168.1.1", "open_ports": ["80/tcp", "443/tcp"], "closed_ports": ["3306/tcp"], "banners": {}}
+{"ts": 1760258416, "target": "192.168.1.2", "open_ports": [], "closed_ports": ["443/tcp", "3306/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760258419, "target": "192.168.1.14", "open_ports": [], "closed_ports": ["3306/tcp", "443/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760258419, "target": "192.168.1.15", "open_ports": [], "closed_ports": ["80/tcp", "443/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760258419, "target": "192.168.1.10", "open_ports": [], "closed_ports": ["443/tcp", "80/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760258419, "target": "192.168.1.11", "open_ports": [], "closed_ports": ["443/tcp", "3306/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760258419, "target": "192.168.1.13", "open_ports": [], "closed_ports": ["80/tcp", "443/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760258422, "target": "192.168.1.12", "open_ports": [], "closed_ports": ["80/tcp", "443/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760258999, "target": "127.0.0.1", "open_ports": ["3306/tcp"], "closed_ports": ["443/tcp", "80/tcp", "2/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u0014\u0000\u0000\u0000\u0003]\u0017I5c\u0005F\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0007\u001b\u000fI~\u001a>Y\u0012\u0012s\u001d\u0000caching_sha2_password\u0000"}}
+{"ts": 1760259001, "target": "127.0.0.1", "open_ports": ["3306/tcp"], "closed_ports": ["2/tcp", "443/tcp", "80/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u0018\u0000\u0000\u0000yi8\u001e}\u000ew\u0003\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u001f\u001bE%\u0018`ca\b;\u0013S\u0000caching_sha2_password\u0000"}}
+{"ts": 1760259001, "target": "127.0.0.2", "open_ports": ["3306/tcp"], "closed_ports": ["80/tcp", "443/tcp", "2/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u0017\u0000\u0000\u0000OMnN\u000f\u000e g\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0019+\u000bN\u000bM\u001b\u0007FZ#\u0000caching_sha2_password\u0000"}}
+{"ts": 1760259004, "target": "192.168.1.1", "open_ports": ["80/tcp", "443/tcp"], "closed_ports": ["2/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760259004, "target": "192.168.1.2", "open_ports": [], "closed_ports": ["2/tcp", "443/tcp", "3306/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259007, "target": "192.168.1.10", "open_ports": [], "closed_ports": ["443/tcp", "3306/tcp", "2/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259007, "target": "192.168.1.13", "open_ports": [], "closed_ports": ["3306/tcp", "443/tcp", "2/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259007, "target": "192.168.1.15", "open_ports": [], "closed_ports": ["443/tcp", "2/tcp", "3306/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259007, "target": "192.168.1.14", "open_ports": [], "closed_ports": ["2/tcp", "443/tcp", "3306/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259010, "target": "192.168.1.12", "open_ports": [], "closed_ports": ["3306/tcp", "443/tcp", "2/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259010, "target": "192.168.1.11", "open_ports": [], "closed_ports": ["80/tcp", "443/tcp", "3306/tcp", "2/tcp"], "banners": {}}
+{"ts": 1760259359, "target": "127.0.0.1", "open_ports": ["3306/tcp"], "closed_ports": ["443/tcp", "2/tcp", "80/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u001a\u0000\u0000\u0000LG\u0019q%d\u0003L\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000T)zkpa+U^.\u0005\f\u0000caching_sha2_password\u0000"}}
+{"ts": 1760259361, "target": "127.0.0.1", "open_ports": ["3306/tcp"], "closed_ports": ["443/tcp", "80/tcp", "2/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u001e\u0000\u0000\u0000\u0001TW\u0016t&\\3\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u00005Z&K^_Y}k.\"y\u0000caching_sha2_password\u0000"}}
+{"ts": 1760259361, "target": "127.0.0.2", "open_ports": ["3306/tcp"], "closed_ports": ["2/tcp", "80/tcp", "443/tcp"], "banners": {"3306/tcp": "J\u0000\u0000\u0000\n8.0.43\u0000\u001d\u0000\u0000\u0000&u\u0005\u00108XW{\u0000\u0002\u0000\u0015\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000;+_Y\u001828\f`.r\u0011\u0000caching_sha2_password\u0000"}}
+{"ts": 1760259364, "target": "192.168.1.2", "open_ports": [], "closed_ports": ["443/tcp", "3306/tcp", "80/tcp", "2/tcp"], "banners": {}}
+{"ts": 1760259364, "target": "192.168.1.1", "open_ports": ["80/tcp", "443/tcp"], "closed_ports": ["2/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760259367, "target": "192.168.1.10", "open_ports": [], "closed_ports": ["443/tcp", "2/tcp", "3306/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259367, "target": "192.168.1.15", "open_ports": [], "closed_ports": ["2/tcp", "443/tcp", "80/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760259367, "target": "192.168.1.14", "open_ports": [], "closed_ports": ["3306/tcp", "443/tcp", "80/tcp", "2/tcp"], "banners": {}}
+{"ts": 1760259367, "target": "192.168.1.13", "open_ports": [], "closed_ports": ["3306/tcp", "2/tcp", "443/tcp", "80/tcp"], "banners": {}}
+{"ts": 1760259370, "target": "192.168.1.11", "open_ports": [], "closed_ports": ["80/tcp", "3306/tcp", "443/tcp", "2/tcp"], "banners": {}}
+{"ts": 1760259370, "target": "192.168.1.12", "open_ports": [], "closed_ports": ["2/tcp", "80/tcp", "443/tcp", "3306/tcp"], "banners": {}}
+{"ts": 1760259452, "target": "192.168.73.1", "open_ports": ["80/tcp"], "closed_ports": ["2/tcp", "3306/tcp", "443/tcp"], "banners": {}}
+{"ts": 1760259493, "target": "192.168.73.1", "open_ports": ["80/tcp"], "closed_ports": ["443/tcp"], "banners": {}}
