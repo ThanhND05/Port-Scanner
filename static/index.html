@@ -7,337 +7,232 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Light theme */
     body { background: #ffffff; color: #0f172a; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; }
     .card { background: linear-gradient(180deg, #ffffff, #f8fafc); }
     .small { font-size: 0.85rem; }
-    .table-wrap { overflow-x: auto; }
-    /* subtle borders for light theme */
-    table thead { background: #f1f5f9; }
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
 <body class="h-full p-6">
   <div class="max-w-7xl mx-auto">
     <header class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">Port Scanner</h1>
-      <div class="text-sm text-slate-600">Backend: <span id="backendHost">/ws/scan</span></div>
+        <h1 class="text-2xl font-bold">Port Scanner</h1>
+        
     </header>
-
     <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Form / Controls -->
-      <section class="card rounded-lg p-5 col-span-1 lg:col-span-1 shadow">
-        <h2 class="font-semibold mb-3">Scan Controls</h2>
-        <form id="scanForm" class="space-y-3">
-          <div>
-            <label class="small">Mode</label>
-            <select id="modeSelect" class="w-full p-2 rounded border bg-white">
-              <option value="single">Single</option>
-              <option value="bulk">Bulk (Range / CIDR)</option>
-            </select>
-          </div>
-
-          <div id="singleBlock">
-            <label class="small">Target (IP or domain)</label>
-            <input id="targetInput" type="text" placeholder="127.0.0.1 or example.com" class="w-full p-2 rounded border" />
-          </div>
-
-          <div id="bulkBlock" class="hidden">
-            <label class="small">IP Range (start-end)</label>
-            <input id="ipRangeInput" type="text" placeholder="192.168.1.1-192.168.1.254" class="w-full p-2 rounded border" />
-            <label class="small mt-2 block">CIDR (one per line)</label>
-            <textarea id="cidrInput" rows="3" class="w-full p-2 rounded border" placeholder="192.168.0.0/24\n10.0.0.0/28"></textarea>
-          </div>
-
-          <div>
-            <label class="small">Custom Ports (comma / range allowed)</label>
-            <input id="portsInput" type="text" placeholder="22,80,443,8000-8010" value="80,443" class="w-full p-2 rounded border" />
-          </div>
-
-          <div>
-            <label class="small">Protocol</label>
-            <select id="protocolInput" class="w-full p-2 rounded border">
-              <option value="tcp">TCP</option>
-              <option value="udp">UDP</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-
-          <div class="flex gap-2">
-            <button id="startBtn" class="flex-1 p-2 bg-emerald-500 text-white rounded hover:bg-emerald-600">Start</button>
-            <button id="stopBtn" class="flex-1 p-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50" disabled>Stop</button>
-          </div>
-
-          <div class="flex gap-2">
-            <button id="exportCsvBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export CSV</button>
-            <button id="exportJsonBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export JSON</button>
-          </div>
-
-          <div class="mt-3 small text-slate-600">
-            <p><strong>Note:</strong> Use this tool for lab/internal testing only. Do not scan external networks without permission.</p>
-          </div>
-        </form>
-      </section>
-
-      <!-- Metrics & Charts -->
-      <section class="card rounded-lg p-5 col-span-2 lg:col-span-2 shadow">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div class="p-4 rounded border text-center">
-            <div class="text-sm text-slate-600">Open Ports</div>
-            <div id="openCount" class="text-3xl font-bold">0</div>
-          </div>
-          <div class="p-4 rounded border text-center">
-            <div class="text-sm text-slate-600">Closed Ports</div>
-            <div id="closedCount" class="text-3xl font-bold">0</div>
-          </div>
-          <div class="p-4 rounded border text-center">
-            <div class="text-sm text-slate-600">Progress</div>
-            <div class="text-3xl font-bold"><span id="progressPct">0</span>%</div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="lg:col-span-2">
-            <h3 class="font-semibold mb-2">Targets</h3>
-            <div class="table-wrap rounded border">
-              <table id="targetsTable" class="w-full text-sm table-auto">
-                <thead class="text-slate-600 small">
-                  <tr>
-                    <th class="p-2">Target</th>
-                    <th class="p-2">Open Ports</th>
-                    <th class="p-2">Closed Ports</th>
-                    <th class="p-2">Elapsed</th>
-                  </tr>
-                </thead>
-                <tbody id="targetsBody" class="mono small"></tbody>
-              </table>
+        <section class="card rounded-lg p-5 col-span-1 lg:col-span-1 shadow">
+            <h2 class="font-semibold mb-3">Scan Controls</h2>
+            <form id="scanForm" class="space-y-3">
+                <div><label class="small">Mode</label><select id="modeSelect" class="w-full p-2 rounded border bg-white"><option value="single">Single</option><option value="bulk">Bulk (Range / CIDR)</option></select></div>
+                <div id="singleBlock"><label class="small">Target (IP or domain)</label><input id="targetInput" type="text" placeholder="127.0.0.1 or example.com" class="w-full p-2 rounded border" /></div>
+                <div id="bulkBlock" class="hidden"><label class="small">IP Range (start-end)</label><input id="ipRangeInput" type="text" placeholder="192.168.1.1-192.168.1.254" class="w-full p-2 rounded border" /><label class="small mt-2 block">CIDR (one per line)</label><textarea id="cidrInput" rows="3" class="w-full p-2 rounded border" placeholder="192.168.0.0/24"></textarea></div>
+                <div><label class="small">Custom Ports (comma / range allowed)</label><input id="portsInput" type="text" placeholder="22,80,443,8000-8010" value="80,443" class="w-full p-2 rounded border" /></div>
+                <div><label class="small">Protocol</label><select id="protocolInput" class="w-full p-2 rounded border"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">Both</option></select></div>
+                <div class="flex gap-2">
+                  <button id="startBtn" type="button" class="flex-1 p-2 bg-emerald-500 text-white rounded hover:bg-emerald-600">Start</button>
+                  <button id="stopBtn" type="button" class="flex-1 p-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50" disabled>Stop</button>
+                </div>
+                <div class="flex gap-2"><button id="exportCsvBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export CSV</button><button id="exportJsonBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export JSON</button></div>
+                
+            </form>
+        </section>
+        <section class="card rounded-lg p-5 col-span-2 lg:col-span-2 shadow">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Open Ports</div><div id="openCount" class="text-3xl font-bold">0</div></div>
+                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Closed Ports</div><div id="closedCount" class="text-3xl font-bold">0</div></div>
+                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Progress</div><div class="text-3xl font-bold"><span id="progressPct">0</span>%</div></div>
             </div>
-          </div>
-
-          <div>
-            <h3 class="font-semibold mb-2">Top Open Ports</h3>
-            <canvas id="topPortsChart" height="200"></canvas>
-            <h3 class="font-semibold mt-4 mb-2">Realtime Log</h3>
-            <div id="log" class="mono text-xs p-3 rounded max-h-48 overflow-y-auto small text-slate-700"></div>
-          </div>
-        </div>
-      </section>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="lg:col-span-2">
+                    <h3 class="font-semibold mb-2">Targets</h3>
+                    <div class="rounded border max-h-96 overflow-y-auto custom-scrollbar">
+                        <table id="targetsTable" class="w-full text-sm table-auto">
+                            <thead class="text-slate-600 small sticky top-0 bg-slate-100">
+                                <tr>
+                                    <th class="p-2 text-center w-12">#</th><th class="p-2 text-left">Target</th><th class="p-2 text-left">Open Ports</th><th class="p-2 text-left">Closed Ports</th><th class="p-2 text-left">Elapsed</th>
+                                </tr>
+                            </thead>
+                            <tbody id="targetsBody" class="mono small"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="font-semibold mb-2">Top Open Ports</h3>
+                    <canvas id="topPortsChart" height="200"></canvas>
+                    <h3 class="font-semibold mt-4 mb-2">Realtime Log</h3>
+                    <div id="log" class="mono text-xs p-3 rounded max-h-48 overflow-y-auto small text-slate-700 custom-scrollbar"></div>
+                </div>
+            </div>
+        </section>
     </main>
-
-    <footer class="mt-6 text-xs text-slate-500">Made for lab use — integrate with <code class="bg-slate-100 px-1 rounded">main.py</code> backend.</footer>
+    
   </div>
+  <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-emerald-600 text-white py-2 px-5 rounded-lg shadow-xl transition-opacity duration-500 z-50"></div>
 
 <script>
 (() => {
+  let ws = null, scanning = false, results = [], scanStartTimestamp = 0;
   const wsPath = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/scan`;
-  let ws = null;
-  let scanning = false;
-  let results = []; // array of {target, open_ports[], closed_ports[], ts}
-  let topPorts = {}; // aggregate counts
-  let totalDone = 0, totalTargets = 0;
 
-  // DOM
-  const modeSelect = document.getElementById('modeSelect');
-  const singleBlock = document.getElementById('singleBlock');
-  const bulkBlock = document.getElementById('bulkBlock');
-  const targetInput = document.getElementById('targetInput');
-  const ipRangeInput = document.getElementById('ipRangeInput');
-  const cidrInput = document.getElementById('cidrInput');
-  const portsInput = document.getElementById('portsInput');
-  const protocolInput = document.getElementById('protocolInput');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const exportCsvBtn = document.getElementById('exportCsvBtn');
-  const exportJsonBtn = document.getElementById('exportJsonBtn');
+  // DOM elements
+  const els = {
+    modeSelect: document.getElementById('modeSelect'), singleBlock: document.getElementById('singleBlock'), bulkBlock: document.getElementById('bulkBlock'),
+    targetInput: document.getElementById('targetInput'), ipRangeInput: document.getElementById('ipRangeInput'), cidrInput: document.getElementById('cidrInput'),
+    portsInput: document.getElementById('portsInput'), protocolInput: document.getElementById('protocolInput'),
+    startBtn: document.getElementById('startBtn'), stopBtn: document.getElementById('stopBtn'),
+    exportCsvBtn: document.getElementById('exportCsvBtn'), exportJsonBtn: document.getElementById('exportJsonBtn'),
+    openCount: document.getElementById('openCount'), closedCount: document.getElementById('closedCount'), progressPct: document.getElementById('progressPct'),
+    targetsBody: document.getElementById('targetsBody'), log: document.getElementById('log'), toast: document.getElementById('toast'),
+  };
 
-  const openCountEl = document.getElementById('openCount');
-  const closedCountEl = document.getElementById('closedCount');
-  const progressPctEl = document.getElementById('progressPct');
-  const targetsBody = document.getElementById('targetsBody');
-  const logEl = document.getElementById('log');
+  const topChart = new Chart(document.getElementById('topPortsChart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#0ea5a4' }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } });
 
-  // Chart
-  let topChartCtx = document.getElementById('topPortsChart').getContext('2d');
-  let topChart = new Chart(topChartCtx, {
-    type: 'bar',
-    data: { labels: [], datasets: [{ label: 'Open count', data: [], backgroundColor: '#0ea5a4' }] },
-    options: { scales: { x: { ticks: { color: '#0f172a' } }, y: { ticks: { color: '#0f172a' }, beginAtZero: true } }, plugins: { legend: { display: false } } }
-  });
+  const showToast = (message, duration = 3000) => { els.toast.textContent = message; els.toast.classList.remove('hidden'); setTimeout(() => els.toast.classList.add('hidden'), duration); };
+  const formatElapsed = ts => { const s = Math.floor(Date.now()/1000 - ts); return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`; };
 
-  function formatElapsed(startTs) {
-    if (!startTs) return '-';
-    const s = Math.floor((Date.now()/1000) - startTs);
-    if (s < 1) return '0s';
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s/60); const r = s%60; return `${m}m ${r}s`;
-  }
-
-  function updateTargetsTable() {
-    targetsBody.innerHTML = '';
-    results.forEach(r => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="p-2 align-top">${r.target}</td>
-        <td class="p-2 align-top">${r.open_ports.length ? r.open_ports.join(', ') : '<span class="text-slate-400">-</span>'}</td>
-        <td class="p-2 align-top">${r.closed_ports.length ? r.closed_ports.join(', ') : '<span class="text-slate-400">-</span>'}</td>
-        <td class="p-2 align-top">${formatElapsed(r.ts)}</td>
-      `;
-      targetsBody.appendChild(tr);
-    });
-  }
-
-  function updateTopPortsChart() {
-    const items = Object.entries(topPorts).sort((a,b)=>b[1]-a[1]).slice(0,12);
-    topChart.data.labels = items.map(i=>i[0]);
-    topChart.data.datasets[0].data = items.map(i=>i[1]);
-    topChart.update();
-  }
-
-  function addLog(line, level='info') {
+  const addLog = line => {
     const el = document.createElement('div');
     el.textContent = `[${new Date().toLocaleTimeString()}] ${line}`;
-    logEl.appendChild(el);
-    logEl.scrollTop = logEl.scrollHeight;
-  }
+    els.log.appendChild(el); // SỬA: Dùng append để log mới ở dưới
+    els.log.scrollTop = els.log.scrollHeight; // Tự động cuộn xuống
+  };
 
-  function resetState() {
-    results = [];
-    topPorts = {};
-    totalDone = 0; totalTargets = 0;
-    openCountEl.textContent = '0';
-    closedCountEl.textContent = '0';
-    progressPctEl.textContent = '0';
-    targetsBody.innerHTML = '';
-    topChart.data.labels = []; topChart.data.datasets[0].data = []; topChart.update();
-    logEl.innerHTML = '';
-  }
-
-  modeSelect.addEventListener('change', ()=>{
-    if (modeSelect.value === 'bulk') {
-      singleBlock.classList.add('hidden'); bulkBlock.classList.remove('hidden');
-      targetInput.removeAttribute('required');
-    } else {
-      singleBlock.classList.remove('hidden'); bulkBlock.classList.add('hidden');
-      targetInput.setAttribute('required','true');
+  const updateUI = (data) => {
+    if (data.status === 'running') {
+      els.openCount.textContent = data.open_ports;
+      els.closedCount.textContent = data.closed_ports;
+      const pct = (data.progress_total > 0) ? Math.round((data.progress_done / data.progress_total) * 100) : 0;
+      els.progressPct.textContent = Math.min(100, pct);
     }
+    if (data.top_ports) {
+      const items = Object.entries(data.top_ports).sort((a,b) => b[1]-a[1]).slice(0, 12);
+      topChart.data.labels = items.map(i => i[0]);
+      topChart.data.datasets[0].data = items.map(i => i[1]);
+      topChart.update();
+    }
+    if (data.new_result_line) {
+      addLog(data.new_result_line);
+      const m = /Target:\s*([^|]+)\s*\|\s*Open:\s*(\[.*?\])\s*\|\s*Closed:\s*(\[.*?\])/.exec(data.new_result_line);
+      if (m) {
+        const target = m[1].trim();
+        const newOpenPorts = JSON.parse(m[2].replace(/'/g, '"'));
+        const newClosedPorts = JSON.parse(m[3].replace(/'/g, '"'));
+
+        let entry = results.find(r => r.target === target);
+        if (!entry) {
+            // Nếu target chưa có, tạo mới
+            entry = { target, open_ports: [], closed_ports: [], ts: scanStartTimestamp };
+            results.push(entry);
+        }
+
+        // SỬA 1: Nối (concat) mảng port thay vì ghi đè
+        entry.open_ports = entry.open_ports.concat(newOpenPorts);
+        entry.closed_ports = entry.closed_ports.concat(newClosedPorts);
+        entry.elapsed = formatElapsed(entry.ts);
+
+        // SỬA 2: Tìm dòng <tr> đã có để cập nhật, nếu không có thì mới tạo
+        let tr = els.targetsBody.querySelector(`tr[data-target="${target}"]`);
+        if (!tr) {
+            tr = document.createElement('tr');
+            tr.dataset.target = target; // Đặt định danh để tìm kiếm
+            tr.className = 'border-b border-slate-200 last:border-b-0';
+            els.targetsBody.appendChild(tr);
+        }
+
+        const rowIndex = results.findIndex(r => r.target === target) + 1;
+        tr.innerHTML = `
+            <td class="p-2 align-top text-center">${rowIndex}</td>
+            <td class="p-2 align-top">${entry.target}</td>
+            <td class="p-2 align-top break-all">${entry.open_ports.join(', ') || '<span class="text-slate-400">-</span>'}</td>
+            <td class="p-2 align-top break-all">${entry.closed_ports.join(', ') || '<span class="text-slate-400">-</span>'}</td>
+            <td class="p-2 align-top">${entry.elapsed}</td>
+        `;
+    }
+    }
+  };
+
+  const resetState = () => {
+    results = []; scanStartTimestamp = 0;
+    ['openCount', 'closedCount', 'progressPct'].forEach(id => els[id].textContent = '0');
+    els.targetsBody.innerHTML = ''; els.log.innerHTML = '';
+    topChart.data.labels = []; topChart.data.datasets[0].data = []; topChart.update();
+  };
+
+  const stopScan = (message) => {
+    addLog(message);
+    scanning = false;
+    els.startBtn.disabled = false;
+    els.stopBtn.disabled = true;
+  };
+  
+  els.modeSelect.addEventListener('change', () => {
+    const isBulk = els.modeSelect.value === 'bulk';
+    els.singleBlock.classList.toggle('hidden', isBulk);
+    els.bulkBlock.classList.toggle('hidden', !isBulk);
   });
 
-  startBtn.addEventListener('click', (ev)=>{
+  els.startBtn.addEventListener('click', ev => {
     ev.preventDefault();
     if (scanning) return;
-    // prepare payload
-    const payload = { mode: modeSelect.value, ports: portsInput.value || '', protocol: protocolInput.value };
-    if (modeSelect.value === 'single') payload.target = targetInput.value.trim();
-    else { payload.ip_range = ipRangeInput.value.trim(); payload.cidr = cidrInput.value.trim(); }
 
-    // basic validation
-    if (modeSelect.value === 'single' && !payload.target) { addLog('Target required for single mode', 'error'); return; }
-    if (modeSelect.value === 'bulk' && !payload.ip_range && !payload.cidr) { addLog('IP range or CIDR required for bulk mode', 'error'); return; }
+    const payload = { command: 'start', mode: els.modeSelect.value, ports: els.portsInput.value, protocol: els.protocolInput.value };
+    if (payload.mode === 'single') payload.target = els.targetInput.value.trim();
+    else { payload.ip_range = els.ipRangeInput.value.trim(); payload.cidr = els.cidrInput.value.trim(); }
 
+    if ((payload.mode === 'single' && !payload.target) || (payload.mode === 'bulk' && !payload.ip_range && !payload.cidr)) {
+      return addLog('Target/Range/CIDR is required.');
+    }
+    
     resetState();
-
-    // open WS
+    scanStartTimestamp = Math.floor(Date.now() / 1000);
     ws = new WebSocket(wsPath);
-    ws.addEventListener('open', ()=>{
-      addLog('WebSocket connected');
-      ws.send(JSON.stringify(payload));
-      scanning = true; startBtn.disabled = true; stopBtn.disabled = false;
-    });
 
-    // message handler: parse new_result_line and maintain counts from results[] (avoid BE overwriting totals)
-    ws.addEventListener('message', (evt)=>{
+    ws.onopen = () => { addLog('WebSocket connected. Starting scan...'); ws.send(JSON.stringify(payload)); scanning = true; els.startBtn.disabled = true; els.stopBtn.disabled = false; };
+    ws.onclose = () => { if (scanning) stopScan('WebSocket closed unexpectedly.'); };
+    ws.onerror = () => stopScan('WebSocket error.');
+    ws.onmessage = evt => {
       try {
         const data = JSON.parse(evt.data);
-        if (data.type === 'error') { addLog('Error: '+data.message, 'error'); return; }
-
-        // merge top_ports if present
-        if (data.top_ports) {
-          for (const [k,v] of Object.entries(data.top_ports)) topPorts[k] = (topPorts[k]||0) + v;
-          updateTopPortsChart();
-        }
-
-        // parse and apply result line updates (source of truth)
-        if (data.new_result_line) {
-          addLog(data.new_result_line);
-          const m = /Target:\s*([^|]+)\|\s*Open:\s*(\[[^\]]*\])\s*\|\s*Closed:\s*(\[[^\]]*\])/.exec(data.new_result_line);
-          if (m) {
-            const target = m[1].trim();
-            const opens = JSON.parse(m[2].replace(/'/g,'"')) || [];
-            const closes = JSON.parse(m[3].replace(/'/g,'"')) || [];
-
-            const idx = results.findIndex(r=>r.target===target);
-            const entry = { target, open_ports: opens, closed_ports: closes, ts: Math.floor(Date.now()/1000) };
-
-            if (idx >= 0) {
-              // update counts by delta
-              const prev = results[idx];
-              const prevOpen = prev.open_ports ? prev.open_ports.length : 0;
-              const prevClosed = prev.closed_ports ? prev.closed_ports.length : 0;
-              const newOpen = opens.length;
-              const newClosed = closes.length;
-
-              const deltaOpen = newOpen - prevOpen;
-              const deltaClosed = newClosed - prevClosed;
-
-              openCountEl.textContent = String(Math.max(0, Number(openCountEl.textContent || 0) + deltaOpen));
-              closedCountEl.textContent = String(Math.max(0, Number(closedCountEl.textContent || 0) + deltaClosed));
-
-              results[idx] = entry;
-            } else {
-              results.push(entry);
-              openCountEl.textContent = String(Number(openCountEl.textContent || 0) + opens.length);
-              closedCountEl.textContent = String(Number(closedCountEl.textContent || 0) + closes.length);
-            }
-
-            updateTargetsTable();
-
-            // progress: prefer BE-provided total if available; else use heuristic
-            if (data.progress_total !== undefined) totalTargets = data.progress_total;
-            const completed = results.length;
-            const pct = totalTargets > 0 ? Math.min(100, Math.round((completed / totalTargets) * 100)) : Math.min(100, completed);
-            progressPctEl.textContent = pct;
-          }
-        }
-
-        // status handling
+        if (data.type === 'error') return addLog(`Error: ${data.message}`);
+        updateUI(data);
         if (data.status === 'done') {
-          addLog('Scan finished');
-          scanning = false; startBtn.disabled = false; stopBtn.disabled = true; ws && ws.close();
+          stopScan('Scan finished.');
+          els.progressPct.textContent = '100';
+          showToast('Scan finished successfully! ✅');
+        } else if (data.status === 'stopped') {
+          stopScan('Scan stopped by user.');
+          showToast('Scan was stopped. 🛑', 2000);
         }
-        if (data.status === 'stopped' || data.status === 'cancelled') {
-          addLog('Scan stopped'); scanning = false; startBtn.disabled = false; stopBtn.disabled = true; ws && ws.close();
-        }
-
-      } catch (e) { console.error('WS parse error', e); }
-    });
-
-    ws.addEventListener('close', ()=>{ if (scanning) addLog('WebSocket closed unexpectedly'); scanning=false; startBtn.disabled=false; stopBtn.disabled=true; });
-    ws.addEventListener('error', (e)=>{ addLog('WebSocket error'); console.error(e); scanning=false; startBtn.disabled=false; stopBtn.disabled=true; });
+      } catch (e) { console.error('WS parse error', e); addLog('Failed to process message.'); }
+    };
   });
 
-  stopBtn.addEventListener('click', ()=>{
-    if (!ws || !scanning) return;
-    ws.send(JSON.stringify({ command: 'stop' }));
-    addLog('Stop requested');
+  els.stopBtn.addEventListener('click', () => { if (ws && scanning) ws.send(JSON.stringify({ command: 'stop' })); });
+
+  const exportData = (content, type, filename) => {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+  };
+
+  els.exportCsvBtn.addEventListener('click', () => {
+      if (!results.length) return alert('No results to export');
+      const header = ['#', 'target', 'open_ports', 'closed_ports', 'elapsed'];
+      const rows = results.map((r, i) => [i + 1, r.target, r.open_ports.join(';'), r.closed_ports.join(';'), r.elapsed]);
+      const csv = [header, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+      exportData(csv, 'text/csv', 'scan_results.csv');
   });
 
-  exportCsvBtn.addEventListener('click', ()=>{
-    if (!results.length) return alert('No results to export');
-    const rows = [];
-    rows.push(['target','open_ports','closed_ports','ts']);
-    for (const r of results) rows.push([r.target, r.open_ports.join(';'), r.closed_ports.join(';'), r.ts||'']);
-    const csv = rows.map(r=>r.map(cell=>`"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], {type: 'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download='scan_results.csv'; a.click(); URL.revokeObjectURL(url);
+  els.exportJsonBtn.addEventListener('click', () => {
+      if (!results.length) return alert('No results to export');
+      exportData(JSON.stringify(results, null, 2), 'application/json', 'scan_results.json');
   });
-
-  exportJsonBtn.addEventListener('click', ()=>{
-    if (!results.length) return alert('No results to export');
-    const blob = new Blob([JSON.stringify(results, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='scan_results.json'; a.click(); URL.revokeObjectURL(url);
-  });
-
 })();
 </script>
 </body>
