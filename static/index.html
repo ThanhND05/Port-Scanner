@@ -15,6 +15,7 @@
     .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
   </style>
 </head>
 <body class="h-full p-6">
@@ -31,36 +32,53 @@
                 <div id="singleBlock"><label class="small">Target (IP or domain)</label><input id="targetInput" type="text" placeholder="127.0.0.1 or example.com" class="w-full p-2 rounded border" /></div>
                 <div id="bulkBlock" class="hidden"><label class="small">IP Range (start-end)</label><input id="ipRangeInput" type="text" placeholder="192.168.1.1-192.168.1.254" class="w-full p-2 rounded border" /><label class="small mt-2 block">CIDR (one per line)</label><textarea id="cidrInput" rows="3" class="w-full p-2 rounded border" placeholder="192.168.0.0/24"></textarea></div>
                 <div><label class="small">Custom Ports (comma / range allowed)</label><input id="portsInput" type="text" placeholder="22,80,443,8000-8010" value="80,443" class="w-full p-2 rounded border" /></div>
-                <div><label class="small">Protocol</label><select id="protocolInput" class="w-full p-2 rounded border"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">Both</option></select></div>
+                <div id="protocolDiv"><label class="small">Protocol</label><select id="protocolInput" class="w-full p-2 rounded border"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">Both</option></select></div>
+                <div id="scanTypeBlock">
+                    <label class="small">TCP Scan Type</label>
+                    <select id="scanTypeInput" class="w-full p-2 rounded border bg-white">
+                        <option value="tcp-connect">TCP Connect (Default)</option>
+                        <option value="tcp-syn">TCP SYN Scan (Yêu cầu Root/Admin)</option>
+                        <option value="tcp-ack">TCP ACK Scan (Phát hiện Firewall)</option>
+                        <option value="vuln">Vulnerability Scan (Nmap)</option>
+                    </select>
+                </div>
                 <div class="flex gap-2">
-                  <button id="startBtn" type="button" class="flex-1 p-2 bg-emerald-500 text-white rounded hover:bg-emerald-600">Start</button>
-                  <button id="stopBtn" type="button" class="flex-1 p-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50" disabled>Stop</button>
+                    <button id="startBtn" type="button" class="flex-1 p-2 bg-emerald-500 text-white rounded hover:bg-emerald-600">Start</button>
+                    <button id="stopBtn" type="button" class="flex-1 p-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50" disabled>Stop</button>
                 </div>
                 <div class="flex gap-2"><button id="exportCsvBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export CSV</button><button id="exportJsonBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export JSON</button></div>
                 
             </form>
         </section>
         <section class="card rounded-lg p-5 col-span-2 lg:col-span-2 shadow">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Open Ports</div><div id="openCount" class="text-3xl font-bold">0</div></div>
                 <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Closed Ports</div><div id="closedCount" class="text-3xl font-bold">0</div></div>
+                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Filtered Ports</div><div id="filteredCount" class="text-3xl font-bold">0</div></div>
                 <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Progress</div><div class="text-3xl font-bold"><span id="progressPct">0</span>%</div></div>
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div class="lg:col-span-2">
+                
+                <div id="targetsTableDiv" class="lg:col-span-2">
                     <h3 class="font-semibold mb-2">Targets</h3>
                     <div class="rounded border max-h-96 overflow-y-auto custom-scrollbar">
                         <table id="targetsTable" class="w-full text-sm table-auto">
                             <thead class="text-slate-600 small sticky top-0 bg-slate-100">
                                 <tr>
-                                    <th class="p-2 text-center w-12">#</th><th class="p-2 text-left">Target</th><th class="p-2 text-left">Open Ports</th><th class="p-2 text-left">Closed Ports</th><th class="p-2 text-left">Elapsed</th>
+                                    <th class="p-2 text-center w-12">#</th><th class="p-2 text-left">Target</th><th class="p-2 text-left">Open Ports</th><th class="p-2 text-left">Closed Ports</th><th class="p-2 text-left">Filtered Ports</th><th class="p-2 text-left">Elapsed</th>
                                 </tr>
                             </thead>
                             <tbody id="targetsBody" class="mono small"></tbody>
                         </table>
                     </div>
                 </div>
-                <div>
+
+                <div id="vulnResultsArea" class="lg:col-span-2 hidden">
+                    <h3 class="font-semibold mb-2">Vulnerability Results</h3>
+                    <div id="vulnResultsBody" class="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                        </div>
+                </div>
+                <div id="topPortsDiv">
                     <h3 class="font-semibold mb-2">Top Open Ports</h3>
                     <canvas id="topPortsChart" height="200"></canvas>
                     <h3 class="font-semibold mt-4 mb-2">Realtime Log</h3>
@@ -78,15 +96,24 @@
   let ws = null, scanning = false, results = [], scanStartTimestamp = 0;
   const wsPath = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/scan`;
 
-  // DOM elements
+  
   const els = {
     modeSelect: document.getElementById('modeSelect'), singleBlock: document.getElementById('singleBlock'), bulkBlock: document.getElementById('bulkBlock'),
     targetInput: document.getElementById('targetInput'), ipRangeInput: document.getElementById('ipRangeInput'), cidrInput: document.getElementById('cidrInput'),
-    portsInput: document.getElementById('portsInput'), protocolInput: document.getElementById('protocolInput'),
+    portsInput: document.getElementById('portsInput'), 
+    protocolDiv: document.getElementById('protocolDiv'), 
+    protocolInput: document.getElementById('protocolInput'),
+    scanTypeBlock: document.getElementById('scanTypeBlock'),
+    scanTypeInput: document.getElementById('scanTypeInput'),
     startBtn: document.getElementById('startBtn'), stopBtn: document.getElementById('stopBtn'),
     exportCsvBtn: document.getElementById('exportCsvBtn'), exportJsonBtn: document.getElementById('exportJsonBtn'),
     openCount: document.getElementById('openCount'), closedCount: document.getElementById('closedCount'), progressPct: document.getElementById('progressPct'),
+    filteredCount: document.getElementById('filteredCount'),
     targetsBody: document.getElementById('targetsBody'), log: document.getElementById('log'), toast: document.getElementById('toast'),
+    targetsTableDiv: document.getElementById('targetsTableDiv'),
+    topPortsDiv: document.getElementById('topPortsDiv'),
+    vulnResultsArea: document.getElementById('vulnResultsArea'),
+    vulnResultsBody: document.getElementById('vulnResultsBody'),
   };
 
   const topChart = new Chart(document.getElementById('topPortsChart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#0ea5a4' }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } });
@@ -94,71 +121,144 @@
   const showToast = (message, duration = 3000) => { els.toast.textContent = message; els.toast.classList.remove('hidden'); setTimeout(() => els.toast.classList.add('hidden'), duration); };
   const formatElapsed = ts => { const s = Math.floor(Date.now()/1000 - ts); return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`; };
 
+
+  const escapeHTML = (str) => str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
   const addLog = line => {
     const el = document.createElement('div');
     el.textContent = `[${new Date().toLocaleTimeString()}] ${line}`;
-    els.log.appendChild(el); // SỬA: Dùng append để log mới ở dưới
-    els.log.scrollTop = els.log.scrollHeight; // Tự động cuộn xuống
+    els.log.appendChild(el);
+    els.log.scrollTop = els.log.scrollHeight;
   };
 
   const updateUI = (data) => {
     if (data.status === 'running') {
-      els.openCount.textContent = data.open_ports;
-      els.closedCount.textContent = data.closed_ports;
+      if (data.open_ports !== undefined) els.openCount.textContent = data.open_ports;
+      if (data.closed_ports !== undefined) els.closedCount.textContent = data.closed_ports;
+      if (data.filtered_ports_total !== undefined) els.filteredCount.textContent = data.filtered_ports_total;
       const pct = (data.progress_total > 0) ? Math.round((data.progress_done / data.progress_total) * 100) : 0;
       els.progressPct.textContent = Math.min(100, pct);
     }
+
     if (data.top_ports) {
       const items = Object.entries(data.top_ports).sort((a,b) => b[1]-a[1]).slice(0, 12);
       topChart.data.labels = items.map(i => i[0]);
       topChart.data.datasets[0].data = items.map(i => i[1]);
       topChart.update();
     }
-    if (data.new_result_line) {
-      addLog(data.new_result_line);
-      const m = /Target:\s*([^|]+)\s*\|\s*Open:\s*(\[.*?\])\s*\|\s*Closed:\s*(\[.*?\])/.exec(data.new_result_line);
-      if (m) {
-        const target = m[1].trim();
-        const newOpenPorts = JSON.parse(m[2].replace(/'/g, '"'));
-        const newClosedPorts = JSON.parse(m[3].replace(/'/g, '"'));
 
-        let entry = results.find(r => r.target === target);
-        if (!entry) {
-            // Nếu target chưa có, tạo mới
-            entry = { target, open_ports: [], closed_ports: [], ts: scanStartTimestamp };
-            results.push(entry);
+    if (data.new_vuln_result) {
+        const res = data.new_vuln_result;
+        const target = res.target;
+        const vulns = res.vulnerabilities || [];
+        const error = res.error; 
+
+        let targetDiv = els.vulnResultsBody.querySelector(`div[data-target="${target}"]`);
+        if (!targetDiv) {
+            targetDiv = document.createElement('div');
+            targetDiv.dataset.target = target;
+            targetDiv.className = 'mb-4';
+            targetDiv.innerHTML = `<h4 class="font-semibold text-base mb-2 p-2 bg-slate-100 rounded">${escapeHTML(target)}</h4><div class="vuln-list space-y-2"></div>`;
+            els.vulnResultsBody.appendChild(targetDiv);
         }
 
-        // SỬA 1: Nối (concat) mảng port thay vì ghi đè
-        entry.open_ports = entry.open_ports.concat(newOpenPorts);
-        entry.closed_ports = entry.closed_ports.concat(newClosedPorts);
-        entry.elapsed = formatElapsed(entry.ts);
+        const listDiv = targetDiv.querySelector('.vuln-list');
+        listDiv.innerHTML = ''; 
 
-        // SỬA 2: Tìm dòng <tr> đã có để cập nhật, nếu không có thì mới tạo
-        let tr = els.targetsBody.querySelector(`tr[data-target="${target}"]`);
-        if (!tr) {
-            tr = document.createElement('tr');
-            tr.dataset.target = target; // Đặt định danh để tìm kiếm
-            tr.className = 'border-b border-slate-200 last:border-b-0';
-            els.targetsBody.appendChild(tr);
+
+        if (error) {
+            listDiv.innerHTML = `<div class="p-3 rounded border bg-red-50 border-red-200 text-red-700 small">
+                                     <span class="font-bold">Scan Error:</span> ${escapeHTML(error)}
+                                 </div>`;
+            addLog(`Target: ${target} | Scan FAILED: ${error}`);
+        
+        } else if (vulns.length === 0) {
+            listDiv.innerHTML = `<div class="p-3 rounded border bg-green-50 border-green-200 text-green-700 small">✅ Không tìm thấy lỗ hổng (dựa trên script 'vuln' của Nmap).</div>`;
+            addLog(`Target: ${target} | Vulnerabilities processed: 0`);
+        
+        } else {
+            vulns.forEach(v => {
+              const vulnEl = document.createElement('div');
+              let bgColor = 'bg-red-50';
+              let borderColor = 'border-red-200';
+              let titleColor = 'text-red-700'; 
+
+              if (v.script_id.startsWith("ERROR:")) {
+                  bgColor = 'bg-yellow-50'; 
+                  borderColor = 'border-yellow-200';
+                  titleColor = 'text-yellow-700';
+              }
+
+              vulnEl.className = `p-3 rounded border ${bgColor} ${borderColor}`;
+              const escapedOutput = escapeHTML(v.output);
+
+              vulnEl.innerHTML = `
+                  <div class="font-bold ${titleColor} small">${escapeHTML(v.script_id)} (${escapeHTML(v.port)})</div>
+                  <div class="mono text-xs text-slate-700 mt-1">${escapeHTML(v.service)}</div>
+                  <pre class="mono text-xs text-slate-900 mt-2 p-2 bg-white rounded overflow-x-auto custom-scrollbar">${escapedOutput}</pre>
+              `;
+              listDiv.appendChild(vulnEl);
+          });
+            addLog(`Target: ${target} | Vulnerabilities processed: ${vulns.length}`);
         }
-
-        const rowIndex = results.findIndex(r => r.target === target) + 1;
-        tr.innerHTML = `
-            <td class="p-2 align-top text-center">${rowIndex}</td>
-            <td class="p-2 align-top">${entry.target}</td>
-            <td class="p-2 align-top break-all">${entry.open_ports.join(', ') || '<span class="text-slate-400">-</span>'}</td>
-            <td class="p-2 align-top break-all">${entry.closed_ports.join(', ') || '<span class="text-slate-400">-</span>'}</td>
-            <td class="p-2 align-top">${entry.elapsed}</td>
-        `;
+        
     }
+    
+
+    if (data.new_result_line) {
+        addLog(data.new_result_line);
+        const m = /Target:\s*([^|]+)\s*\|\s*Open:\s*(\[.*?\])\s*\|\s*Closed:\s*(\[.*?\])\s*\|\s*Filtered:\s*(\[.*?\])/.exec(data.new_result_line);
+        if (m) {
+            const target = m[1].trim();
+            const newOpenPorts = JSON.parse(m[2].replace(/'/g, '"'));
+            const newClosedPorts = JSON.parse(m[3].replace(/'/g, '"'));
+            const newFilteredPorts = JSON.parse(m[4].replace(/'/g, '"'));
+            let entry = results.find(r => r.target === target);
+            if (!entry) {
+                entry = { target, open_ports: [], closed_ports: [], filtered_ports: [], ts: scanStartTimestamp };
+                results.push(entry);
+            }
+
+            entry.open_ports = entry.open_ports.concat(newOpenPorts);
+            entry.closed_ports = entry.closed_ports.concat(newClosedPorts);
+            entry.filtered_ports = entry.filtered_ports.concat(newFilteredPorts);
+            entry.elapsed = formatElapsed(entry.ts);
+
+            let tr = els.targetsBody.querySelector(`tr[data-target="${target}"]`);
+            if (!tr) {
+                tr = document.createElement('tr');
+                tr.dataset.target = target;
+                tr.className = 'border-b border-slate-200 last:border-b-0';
+                els.targetsBody.appendChild(tr);
+            }
+
+            const rowIndex = results.findIndex(r => r.target === target) + 1;
+            tr.innerHTML = `
+                <td class="p-2 align-top text-center">${rowIndex}</td>
+                <td class="p-2 align-top">${escapeHTML(entry.target)}</td>
+                <td class="p-2 align-top break-all">${escapeHTML(entry.open_ports.join(', ')) || '<span class="text-slate-400">-</span>'}</td>
+                <td class="p-2 align-top break-all">${escapeHTML(entry.closed_ports.join(', ')) || '<span class="text-slate-400">-</span>'}</td>
+                <td class="p-2 align-top break-all">${escapeHTML(entry.filtered_ports.join(', ')) || '<span class="text-slate-400">-</span>'}</td>
+                <td class="p-2 align-top">${escapeHTML(entry.elapsed)}</td>
+            `;
+        }
     }
   };
 
   const resetState = () => {
     results = []; scanStartTimestamp = 0;
-    ['openCount', 'closedCount', 'progressPct'].forEach(id => els[id].textContent = '0');
+    ['openCount', 'closedCount', 'progressPct', 'filteredCount'].forEach(id => els[id].textContent = '0');
     els.targetsBody.innerHTML = ''; els.log.innerHTML = '';
+
+    els.vulnResultsBody.innerHTML = ''; 
+    els.vulnResultsArea.classList.add('hidden'); 
+  
+    els.targetsTableDiv.classList.remove('hidden'); 
+    els.topPortsDiv.classList.remove('hidden'); 
+    els.protocolInput.disabled = false;
+    els.protocolDiv.classList.remove('hidden');
+    updateProtocolVisibility();
+    updateScanTypeVisibility();
     topChart.data.labels = []; topChart.data.datasets[0].data = []; topChart.update();
   };
 
@@ -175,11 +275,38 @@
     els.bulkBlock.classList.toggle('hidden', !isBulk);
   });
 
+  const updateScanTypeVisibility = () => {
+      const proto = els.protocolInput.value;
+      const showScanType = (proto === 'tcp' || proto === 'both');
+      els.scanTypeBlock.classList.toggle('hidden', !showScanType);
+  };
+
+  const updateProtocolVisibility = () => {
+      const scanType = els.scanTypeInput.value;
+      if (scanType === 'vuln') {
+          els.protocolInput.value = 'tcp'; 
+          els.protocolDiv.classList.add('hidden'); 
+      } else {
+          els.protocolDiv.classList.remove('hidden'); 
+      }
+  };
+
+  els.protocolInput.addEventListener('change', updateScanTypeVisibility);
+  els.scanTypeInput.addEventListener('change', () => {
+      updateProtocolVisibility();
+      updateScanTypeVisibility(); 
+  });
+  
+
+  updateScanTypeVisibility();
+  updateProtocolVisibility();
+
+
   els.startBtn.addEventListener('click', ev => {
     ev.preventDefault();
     if (scanning) return;
 
-    const payload = { command: 'start', mode: els.modeSelect.value, ports: els.portsInput.value, protocol: els.protocolInput.value };
+    const payload = { command: 'start', mode: els.modeSelect.value, ports: els.portsInput.value, protocol: els.protocolInput.value, scan_type: els.scanTypeInput.value };
     if (payload.mode === 'single') payload.target = els.targetInput.value.trim();
     else { payload.ip_range = els.ipRangeInput.value.trim(); payload.cidr = els.cidrInput.value.trim(); }
 
@@ -188,6 +315,13 @@
     }
     
     resetState();
+    
+    if (payload.scan_type === 'vuln') {
+        els.targetsTableDiv.classList.add('hidden');
+        els.topPortsDiv.classList.add('hidden');
+        els.vulnResultsArea.classList.remove('hidden');
+    }
+
     scanStartTimestamp = Math.floor(Date.now() / 1000);
     ws = new WebSocket(wsPath);
 
@@ -223,14 +357,14 @@
 
   els.exportCsvBtn.addEventListener('click', () => {
       if (!results.length) return alert('No results to export');
-      const header = ['#', 'target', 'open_ports', 'closed_ports', 'elapsed'];
-      const rows = results.map((r, i) => [i + 1, r.target, r.open_ports.join(';'), r.closed_ports.join(';'), r.elapsed]);
+      const header = ['#', 'target', 'open_ports', 'closed_ports', 'filtered_ports', 'elapsed'];
+      const rows = results.map((r, i) => [i + 1, r.target, r.open_ports.join(';'), r.closed_ports.join(';'), r.filtered_ports.join(';'), r.elapsed]);
       const csv = [header, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
       exportData(csv, 'text/csv', 'scan_results.csv');
   });
 
   els.exportJsonBtn.addEventListener('click', () => {
-      if (!results.length) return alert('No results to export');
+      if (!results.length) return alert('No results to export (Port scan data is empty)');
       exportData(JSON.stringify(results, null, 2), 'application/json', 'scan_results.json');
   });
 })();
