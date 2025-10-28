@@ -29,18 +29,20 @@ if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 else:
     logger.warning(f"'static/' directory not found at {static_path}")
+app.mount("/results", StaticFiles(directory="Success_Results"), name="results")
 
 
 max_threads = max(8, multiprocessing.cpu_count() * 4)
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_threads)
 
-
 os.makedirs('Success_Results', exist_ok=True)
 SUMMARY_JSON = os.path.join('Success_Results', 'summary.jsonl')
+
 
 def DATA_SAVE(result, filename):
     with open(os.path.join('Success_Results', filename), "a", encoding="utf-8") as save:
         save.write(f'{result}\n')
+
 
 def SAVE_SUMMARY(obj):
     with open(SUMMARY_JSON, "a", encoding="utf-8") as f:
@@ -59,13 +61,16 @@ def parse_ports(ports_str):
                 if a > b: a, b = b, a
                 a, b = max(1, a), min(65535, b)
                 ports_set.update(range(a, b + 1))
-            except Exception: continue
+            except Exception:
+                continue
         else:
             try:
                 p = int(part)
                 if 1 <= p <= 65535: ports_set.add(p)
-            except Exception: continue
+            except Exception:
+                continue
     return sorted(ports_set)
+
 
 def grab_banner(host, port, timeout=1.0):
     try:
@@ -77,12 +82,16 @@ def grab_banner(host, port, timeout=1.0):
             s.close()
     except Exception:
         return ""
+
+
 def IP_Ranger(start_ip, end_ip):
     try:
         start, end = int(ip_address(start_ip)), int(ip_address(end_ip))
         if end < start: start, end = end, start
         return [str(ip_address(ip)) for ip in range(start, end + 1)]
-    except ValueError: return []
+    except ValueError:
+        return []
+
 
 async def watch_cancel(proc: asyncio.subprocess.Process, cancel_event: asyncio.Event):
     await cancel_event.wait()
@@ -90,13 +99,12 @@ async def watch_cancel(proc: asyncio.subprocess.Process, cancel_event: asyncio.E
     try:
         proc.terminate()
     except ProcessLookupError:
-        pass 
+        pass
 
 MAX_CONCURRENT_JOBS = 200
-
 async def scan_ports_threaded(host, ports, cancel_event, semaphore):
     loop = asyncio.get_running_loop()
-    result = {"target": host, "open_ports": [], "closed_ports": [],"filtered_ports": [], "banners": {}}
+    result = {"target": host, "open_ports": [], "closed_ports": [], "filtered_ports": [], "banners": {}}
     try:
         resolved_ip = await loop.run_in_executor(executor, socket.gethostbyname, host)
     except (socket.gaierror, socket.error) as e:
@@ -127,10 +135,8 @@ async def scan_ports_threaded(host, ports, cancel_event, semaphore):
                 banner = await loop.run_in_executor(executor, grab_banner, resolved_ip, port, 0.8)
                 if banner: result["banners"][label] = banner
                 result["open_ports"].append(label)
-            elif status == "closed":
-                result["closed_ports"].append(label)
-            elif status == "filtered":
-                result["filtered_ports"].append(label)
+            elif status == "closed": result["closed_ports"].append(label)
+            elif status == "filtered": result["filtered_ports"].append(label)
         except asyncio.CancelledError: break
     if result["open_ports"]: DATA_SAVE(host, 'Live_IP.txt')
     else: DATA_SAVE(host, 'RIP_Data.txt')
@@ -138,42 +144,46 @@ async def scan_ports_threaded(host, ports, cancel_event, semaphore):
     SAVE_SUMMARY({"ts": int(time.time()), "target": host, **result})
     return result
 
+
 def _syn_probe(host, port, timeout=PORT_TIMEOUT):
     packet = IP(dst=host) / TCP(sport=RandShort(), dport=port, flags="S")
     response = sr1(packet, timeout=timeout, verbose=0)
     if response is None:
-        return port, None 
-        
+        return port, None
+
     elif response.haslayer(TCP):
         flags = response.getlayer(TCP).flags
-        
+
         if flags == 0x12:
             sr1(IP(dst=host) / TCP(sport=packet[TCP].sport, dport=port, flags="R"), timeout=1, verbose=0)
-            return port, True 
-            
-        elif flags == 0x14: 
-            return port, False 
+            return port, True
+
+        elif flags == 0x14:
+            return port, False
     return port, None
+
 
 def _ack_probe(host, port, timeout=PORT_TIMEOUT):
     try:
         packet = IP(dst=host) / TCP(sport=RandShort(), dport=port, flags="A")
         response = sr1(packet, timeout=timeout, verbose=0)
-        
+
         if response is None:
-            return port, False 
-            
+            return port, False
+
         elif response.haslayer(TCP):
-            if response.getlayer(TCP).flags == 0x4: 
+            if response.getlayer(TCP).flags == 0x4:
                 return port, True
         return port, False
     except Exception as e:
         logger.error(f"Lỗi _ack_probe {host}:{port}: {e}")
         return port, False
 
+
 async def scan_udp_threaded(host, ports, cancel_event, semaphore):
     loop = asyncio.get_running_loop()
     result = {"target": host, "open_ports": [], "closed_ports": []}
+
     def _udp_probe(port):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -181,15 +191,19 @@ async def scan_udp_threaded(host, ports, cancel_event, semaphore):
                 s.sendto(b'\x00', (host, port))
                 s.recvfrom(1024)
                 return port, True
-        except socket.timeout: return port, None
-        except ConnectionRefusedError: return port, False
-        except Exception: return port, False
-    
+        except socket.timeout:
+            return port, None
+        except ConnectionRefusedError:
+            return port, False
+        except Exception:
+            return port, False
+
     async def schedule(port):
         if cancel_event.is_set(): return None
         async with semaphore:
             if cancel_event.is_set(): return None
             return await loop.run_in_executor(executor, _udp_probe, port)
+
     tasks = [schedule(p) for p in ports]
     for fut in asyncio.as_completed(tasks):
         try:
@@ -197,85 +211,88 @@ async def scan_udp_threaded(host, ports, cancel_event, semaphore):
             if not res or cancel_event.is_set(): continue
             port, status = res
             label = f"{port}/udp"
-            if status: result["open_ports"].append(label)
-            else: result["closed_ports"].append(label)
-        except asyncio.CancelledError: break
-    if result["open_ports"]: DATA_SAVE(host, 'Live_IP.txt')
-    else: DATA_SAVE(host, 'RIP_Data.txt')
+            if status:
+                result["open_ports"].append(label)
+            else:
+                result["closed_ports"].append(label)
+        except asyncio.CancelledError:
+            break
+    if result["open_ports"]:
+        DATA_SAVE(host, 'Live_IP.txt')
+    else:
+        DATA_SAVE(host, 'RIP_Data.txt')
     for p in result["open_ports"]: DATA_SAVE(f'{host}:{p}', 'Live_Data.txt')
     SAVE_SUMMARY({"ts": int(time.time()), "target": host, **result})
     return result
 
+
 async def scan_syn_threaded(host, ports, cancel_event, semaphore):
- 
     loop = asyncio.get_running_loop()
     result = {"target": host, "open_ports": [], "closed_ports": [], "filtered_ports": [], "banners": {}}
-    
     async def schedule(port):
         if cancel_event.is_set(): return None
         async with semaphore:
             if cancel_event.is_set(): return None
             return await loop.run_in_executor(executor, _syn_probe, host, port, PORT_TIMEOUT)
-            
     tasks = [schedule(p) for p in ports]
     for fut in asyncio.as_completed(tasks):
         try:
             res = await fut
             if not res or cancel_event.is_set(): continue
-            
             port, status = res
-            
-            if status is True: 
+            if status is True:
                 label = f"{port}/tcp"
                 result["open_ports"].append(label)
                 banner = await loop.run_in_executor(executor, grab_banner, host, port, 0.8)
                 if banner: result["banners"][label] = banner
-            elif status is False: 
+            elif status is False:
                 label = f"{port}/tcp"
                 result["closed_ports"].append(label)
-            else: 
+            else:
                 label = f"{port}/tcp"
                 result["filtered_ports"].append(label)
-                
-        except asyncio.CancelledError: break
-
-    if result["open_ports"]: DATA_SAVE(host, 'Live_IP.txt')
-    else: DATA_SAVE(host, 'RIP_Data.txt')
+        except asyncio.CancelledError:
+            break
+    if result["open_ports"]:
+        DATA_SAVE(host, 'Live_IP.txt')
+    else:
+        DATA_SAVE(host, 'RIP_Data.txt')
     for p in result["open_ports"]: DATA_SAVE(f'{host}:{p}', 'Live_Data.txt')
     SAVE_SUMMARY({"ts": int(time.time()), "target": host, **result})
-    
     return result
+
 
 async def scan_ack_threaded(host, ports, cancel_event, semaphore):
     loop = asyncio.get_running_loop()
     result = {"target": host, "open_ports": [], "closed_ports": [], "filtered_ports": []}
-    
+
     async def schedule(port):
         if cancel_event.is_set(): return None
         async with semaphore:
             if cancel_event.is_set(): return None
             return await loop.run_in_executor(executor, _ack_probe, host, port, PORT_TIMEOUT)
-            
+
     tasks = [schedule(p) for p in ports]
     for fut in asyncio.as_completed(tasks):
         try:
             res = await fut
             if not res or cancel_event.is_set(): continue
-            
+
             port, status = res
             label = f"{port}/tcp"
-            
-            if status is True: 
+
+            if status is True:
                 result["closed_ports"].append(label)
             else:
                 result["filtered_ports"].append(label)
-                
-        except asyncio.CancelledError: break
 
-    if result["closed_ports"]: 
+        except asyncio.CancelledError:
+            break
+
+    if result["closed_ports"]:
         DATA_SAVE(host, 'Live_IP_Unfiltered.txt')
     SAVE_SUMMARY({"ts": int(time.time()), "target": host, **result})
-    
+
     return result
 
 async def scan_vuln_async(host, ports_list, cancel_event):
@@ -286,19 +303,19 @@ async def scan_vuln_async(host, ports_list, cancel_event):
 
     def _run_nmap_blocking():
         try:
-            proc = subprocess.run(command, 
-                                  capture_output=True, 
-                                  text=True, 
-                                  timeout=60, 
+            proc = subprocess.run(command,
+                                  capture_output=True,
+                                  text=True,
+                                  timeout=60,
                                   encoding='utf-8',
                                   errors='ignore')
             return proc.stdout, proc.stderr, proc.returncode
         except subprocess.TimeoutExpired as e:
             logger.warning(f"Nmap for {host} timed out after 1 minutes.")
-            return e.stdout or "", e.stderr or "Scan timed out after 1 minutes.", 
+            return e.stdout or "", e.stderr or "Scan timed out after 1 minutes.", 124
         except Exception as e:
             logger.error(f"Lỗi khi chạy subprocess Nmap {host}: {e}")
-            return "", f"Failed to execute Nmap process: {e}"
+            return "", f"Failed to execute Nmap process: {e}", 1
     try:
         loop = asyncio.get_running_loop()
         if cancel_event.is_set():
@@ -309,18 +326,20 @@ async def scan_vuln_async(host, ports_list, cancel_event):
         if cancel_event.is_set():
             logger.info(f"Nmap for {host} finished, but cancellation was requested.")
             raise asyncio.CancelledError()
-        if returncode != 0:
+        if returncode == 124:  
+            result["error"] = stderr_str  
+        elif returncode == 1 and stdout_str == "": 
+            result["error"] = stderr_str 
+        elif returncode != 0:
             logger.error(f"Nmap lỗi cho {host}: {stderr_str}")
-            
             if "Failed to resolve" in stderr_str or "Couldn't resolve host" in stderr_str:
                 result["error"] = f"Could not resolve host: {host}"
-            elif returncode == -1: 
+            elif returncode == -1:
                 result["error"] = stderr_str
-            elif returncode == -2: 
-                result["error"] = stderr_str 
+            elif returncode == -2:
+                result["error"] = stderr_str
             else:
                 result["error"] = f"Nmap command failed: {stderr_str.strip() or 'Unknown error'}"
-        
         else:
             if not stdout_str:
                 logger.warning(f"Nmap for {host} succeeded but produced no output.")
@@ -348,17 +367,15 @@ async def scan_vuln_async(host, ports_list, cancel_event):
                 except ET.ParseError as pe:
                     logger.error(f"Lỗi phân tích XML Nmap cho {host}: {pe}. Output: {stdout_str[:200]}...")
                     result["error"] = f"Nmap returned invalid XML: {pe}"
-
     except asyncio.CancelledError:
         logger.info(f"Nmap cho {host} đã bị huỷ.")
-        raise 
-    except FileNotFoundError: 
+        raise
+    except FileNotFoundError:
         logger.error("LỖI NGHIÊM TRỌNG: Không tìm thấy 'nmap'.")
         result["error"] = "Nmap not found. Please install it and ensure it's in PATH."
-    except Exception as e: 
+    except Exception as e:
         logger.exception(f"Lỗi không xác định khi quét Nmap {host}: {e}")
         result["error"] = f"An unknown error occurred during Nmap scan: {e}"
-        
     SAVE_SUMMARY({"ts": int(time.time()), "target": host, **result})
     return result
 
@@ -369,6 +386,7 @@ async def root():
             return f.read()
     except Exception as e:
         return HTMLResponse(f"<h1>Error loading HTML: {e}</h1>", status_code=500)
+
 
 @app.websocket("/ws/scan")
 async def websocket_scan(websocket: WebSocket):
@@ -384,10 +402,11 @@ async def websocket_scan(websocket: WebSocket):
         sem = asyncio.Semaphore(min(MAX_CONCURRENT_JOBS, 100))
         all_targets_list = []
         mode = data.get("mode")
+
         if mode == "single":
             t = data.get("target", "").strip()
             if t: all_targets_list.append(t)
-        
+
         elif mode == "bulk":
             ip_range = data.get("ip_range", "").strip()
             if "-" in ip_range:
@@ -395,7 +414,7 @@ async def websocket_scan(websocket: WebSocket):
                     all_targets_list.extend(IP_Ranger(*map(str.strip, ip_range.split("-", 1))))
                 except Exception as e:
                     await websocket.send_json({"type": "error", "message": f"Invalid IP range: {e}"})
-            
+
             cidr_value = data.get("cidr", "").strip()
             if cidr_value:
                 for cidr_line in cidr_value.splitlines():
@@ -407,7 +426,7 @@ async def websocket_scan(websocket: WebSocket):
                         all_targets_list.extend(str(ip) for ip in hosts_generator)
                     except Exception as e:
                         logger.warning(f"Skipping invalid CIDR: {cidr_line} ({e})")
-        
+
         unique_targets = list(dict.fromkeys(filter(None, all_targets_list)))
         if not unique_targets:
             await websocket.send_json({"status": "done", "message": "No valid targets found."})
@@ -424,7 +443,7 @@ async def websocket_scan(websocket: WebSocket):
                 elif scan_type == "tcp-ack":
                     logger.info(f"Queueing ACK Scan for {ip}")
                     all_scan_tasks.append(scan_ack_threaded(ip, ports_, scan_cancel_event, sem))
-                else: 
+                else:
                     logger.info(f"Queueing TCP Connect Scan for {ip}")
                     all_scan_tasks.append(scan_ports_threaded(ip, ports_, scan_cancel_event, sem))
             if protocol in ("udp", "both"):
@@ -434,7 +453,6 @@ async def websocket_scan(websocket: WebSocket):
         completed, open_ports_count, closed_ports_count, filtered_ports_count = 0, 0, 0, 0
         top_ported = {}
         total_tasks = len(all_scan_tasks)
-
         logger.info(f"Processing {total_tasks} tasks for {len(unique_targets)} unique targets.")
         try:
             for ttask in asyncio.as_completed(all_scan_tasks):
@@ -445,17 +463,15 @@ async def websocket_scan(websocket: WebSocket):
                     "progress_done": completed, "progress_total": total_tasks,
                     "status": "running",
                 }
-                if "vulnerabilities" in res:
-                    json_payload["new_vuln_result"] = res
+                if "vulnerabilities" in res: json_payload["new_vuln_result"] = res
                 elif res.get("error"):
                     line = f"Target: {res.get('target')} | ERROR: {res.get('error')}"
                     json_payload["new_result_line"] = line
-                elif "open_ports" in res:                  
+                elif "open_ports" in res:
                     open_ports_count += len(res.get("open_ports", []))
                     closed_ports_count += len(res.get("closed_ports", []))
                     filtered_ports_count += len(res.get("filtered_ports", []))
-                    for p in res.get("open_ports", []):
-                        top_ported[p] = top_ported.get(p, 0) + 1
+                    for p in res.get("open_ports", []): top_ported[p] = top_ported.get(p, 0) + 1
                     filtered_ports_list = res.get('filtered_ports', [])
                     line = f"Target: {res.get('target')} | Open: {res.get('open_ports')} | Closed: {res.get('closed_ports')} | Filtered: {filtered_ports_list}"
                     json_payload.update({
@@ -468,7 +484,7 @@ async def websocket_scan(websocket: WebSocket):
                 await websocket.send_json(json_payload)
         except asyncio.CancelledError:
             logger.info("Scan cancelled by client.")
-        
+
         final_status = "stopped" if scan_cancel_event.is_set() else "done"
         try:
             await websocket.send_json({"status": final_status})
@@ -498,13 +514,15 @@ async def websocket_scan(websocket: WebSocket):
     except Exception as e:
         logger.exception("An error occurred in the websocket connection.")
 
+
 @app.get("/favicon.ico")
 async def favicon():
     return Response(status_code=204)
 
+
 if __name__ == "__main__":
     if sys.platform == "win32":
         logger.info("Setting asyncio policy for Windows")
-       
+
     logger.info(f"[+] Starting scanner with {max_threads} threads")
     uvicorn.run("main:app", host="localhost", port=8000, reload=True, log_level="info")

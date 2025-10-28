@@ -5,103 +5,297 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Port Scanner</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: #ffffff; color: #0f172a; }
+    body { background: #f8fafc; color: #0f172a; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; }
-    .card { background: linear-gradient(180deg, #ffffff, #f8fafc); }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; }
     .small { font-size: 0.85rem; }
-    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     pre { white-space: pre-wrap; word-wrap: break-word; }
+    .tab-button { padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tab-button.active { border-bottom-color: #0ea5e9; color: #0ea5e9; font-weight: 600; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .vuln-output-pre { max-height: 150px; overflow-y: auto; }
+    .history-banner {
+        white-space: pre-wrap;
+        word-break: break-all;
+        font-size: 0.8rem;
+        line-height: 1.4;
+    }
+    input[type="date"] {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        position: relative;
+        background-color: white;
+        padding-right: 2rem;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.7;
+        cursor: pointer;
+    }
+    .stat-filter-btn {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    .stat-filter-btn.active {
+        background-color: #0ea5e9;
+        color: white;
+        border-color: #0ea5e9;
+    }
+    input[type="date"].small {
+        font-size: 0.85rem;
+        padding-top: 6px;
+        padding-bottom: 6px;
+    }
   </style>
 </head>
-<body class="h-full p-6">
+<body class="h-full p-4 md:p-6">
   <div class="max-w-7xl mx-auto">
     <header class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold">Port Scanner</h1>
-        
+        <h1 class="text-2xl font-bold text-slate-800">Port Scanner</h1>
     </header>
-    <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section class="card rounded-lg p-5 col-span-1 lg:col-span-1 shadow">
-            <h2 class="font-semibold mb-3">Scan Controls</h2>
-            <form id="scanForm" class="space-y-3">
-                <div><label class="small">Mode</label><select id="modeSelect" class="w-full p-2 rounded border bg-white"><option value="single">Single</option><option value="bulk">Bulk (Range / CIDR)</option></select></div>
-                <div id="singleBlock"><label class="small">Target (IP or domain)</label><input id="targetInput" type="text" placeholder="127.0.0.1 or example.com" class="w-full p-2 rounded border" /></div>
-                <div id="bulkBlock" class="hidden"><label class="small">IP Range (start-end)</label><input id="ipRangeInput" type="text" placeholder="192.168.1.1-192.168.1.254" class="w-full p-2 rounded border" /><label class="small mt-2 block">CIDR (one per line)</label><textarea id="cidrInput" rows="3" class="w-full p-2 rounded border" placeholder="192.168.0.0/24"></textarea></div>
-                <div><label class="small">Custom Ports (comma / range allowed)</label><input id="portsInput" type="text" placeholder="22,80,443,8000-8010" value="80,443" class="w-full p-2 rounded border" /></div>
-                <div id="protocolDiv"><label class="small">Protocol</label><select id="protocolInput" class="w-full p-2 rounded border"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">Both</option></select></div>
-                <div id="scanTypeBlock">
-                    <label class="small">TCP Scan Type</label>
-                    <select id="scanTypeInput" class="w-full p-2 rounded border bg-white">
-                        <option value="tcp-connect">TCP Connect (Default)</option>
-                        <option value="tcp-syn">TCP SYN Scan (Yêu cầu Root/Admin)</option>
-                        <option value="tcp-ack">TCP ACK Scan (Phát hiện Firewall)</option>
-                        <option value="vuln">Vulnerability Scan (Nmap)</option>
-                    </select>
-                </div>
-                <div class="flex gap-2">
-                    <button id="startBtn" type="button" class="flex-1 p-2 bg-emerald-500 text-white rounded hover:bg-emerald-600">Start</button>
-                    <button id="stopBtn" type="button" class="flex-1 p-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50" disabled>Stop</button>
-                </div>
-                <div class="flex gap-2"><button id="exportCsvBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export CSV</button><button id="exportJsonBtn" type="button" class="flex-1 p-2 bg-slate-100 rounded border">Export JSON</button></div>
-                
-            </form>
-        </section>
-        <section class="card rounded-lg p-5 col-span-2 lg:col-span-2 shadow">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Open Ports</div><div id="openCount" class="text-3xl font-bold">0</div></div>
-                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Closed Ports</div><div id="closedCount" class="text-3xl font-bold">0</div></div>
-                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Filtered Ports</div><div id="filteredCount" class="text-3xl font-bold">0</div></div>
-                <div class="p-4 rounded border text-center"><div class="text-sm text-slate-600">Progress</div><div class="text-3xl font-bold"><span id="progressPct">0</span>%</div></div>
-            </div>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                
-                <div id="targetsTableDiv" class="lg:col-span-2">
-                    <h3 class="font-semibold mb-2">Targets</h3>
-                    <div class="rounded border max-h-96 overflow-y-auto custom-scrollbar">
-                        <table id="targetsTable" class="w-full text-sm table-auto">
-                            <thead class="text-slate-600 small sticky top-0 bg-slate-100">
-                                <tr>
-                                    <th class="p-2 text-center w-12">#</th><th class="p-2 text-left">Target</th><th class="p-2 text-left">Open Ports</th><th class="p-2 text-left">Closed Ports</th><th class="p-2 text-left">Filtered Ports</th><th class="p-2 text-left">Elapsed</th>
-                                </tr>
-                            </thead>
-                            <tbody id="targetsBody" class="mono small"></tbody>
-                        </table>
+
+    <div class="mb-4 border-b border-slate-200">
+      <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+        <button id="tabBtnScan" class="tab-button active" onclick="switchTab('scan')">Scan</button>
+        <button id="tabBtnHistory" class="tab-button" onclick="switchTab('history')">Lịch sử Quét</button>
+        <button id="tabBtnStats" class="tab-button" onclick="switchTab('stats')">Thống kê</button>
+      </nav>
+    </div>
+
+    <div id="tabContentScan" class="tab-content active">
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section class="card rounded-lg p-5 col-span-1 lg:col-span-1 shadow-sm">
+                <h2 class="font-semibold text-slate-700 mb-3">Scan Controls</h2>
+                <form id="scanForm" class="space-y-3">
+                    <div><label class="small text-slate-600">Mode</label><select id="modeSelect" class="w-full p-2 rounded border bg-white border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"><option value="single">Single</option><option value="bulk">Bulk (Range / CIDR)</option></select></div>
+                    <div id="singleBlock"><label class="small text-slate-600">Target (IP or domain)</label><input id="targetInput" type="text" placeholder="127.0.0.1 or example.com" class="w-full p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500" /></div>
+                    <div id="bulkBlock" class="hidden"><label class="small text-slate-600">IP Range (start-end)</label><input id="ipRangeInput" type="text" placeholder="192.168.1.1-192.168.1.254" class="w-full p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500" /><label class="small mt-2 block text-slate-600">CIDR (one per line)</label><textarea id="cidrInput" rows="3" class="w-full p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500" placeholder="192.168.0.0/24"></textarea></div>
+                    <div><label class="small text-slate-600">Custom Ports (comma / range allowed)</label><input id="portsInput" type="text" placeholder="22,80,443,8000-8010" value="80,443" class="w-full p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500" /></div>
+                    <div id="protocolDiv"><label class="small text-slate-600">Protocol</label><select id="protocolInput" class="w-full p-2 rounded border bg-white border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">Both</option></select></div>
+                    <div id="scanTypeBlock">
+                        <label class="small text-slate-600">TCP Scan Type</label>
+                        <select id="scanTypeInput" class="w-full p-2 rounded border bg-white border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+                            <option value="tcp-connect">TCP Connect (Default)</option>
+                            <option value="tcp-syn">TCP SYN Scan (Yêu cầu Root/Admin)</option>
+                            <option value="tcp-ack">TCP ACK Scan (Phát hiện Firewall)</option>
+                            <option value="vuln">Vulnerability Scan (Nmap)</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button id="startBtn" type="button" class="flex-1 p-2 bg-sky-500 text-white rounded hover:bg-sky-600 transition-colors">Start</button>
+                        <button id="stopBtn" type="button" class="flex-1 p-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled>Stop</button>
+                    </div>
+                    <div class="flex gap-2"><button id="exportCsvBtn" type="button" class="flex-1 p-2 bg-slate-100 text-slate-700 rounded border border-slate-300 hover:bg-slate-200 transition-colors">Export CSV</button><button id="exportJsonBtn" type="button" class="flex-1 p-2 bg-slate-100 text-slate-700 rounded border border-slate-300 hover:bg-slate-200 transition-colors">Export JSON</button></div>
+                </form>
+            </section>
+            <section class="card rounded-lg p-5 col-span-2 lg:col-span-2 shadow-sm">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div class="p-4 rounded border border-slate-200 text-center"><div class="text-sm text-slate-500">Open Ports</div><div id="openCount" class="text-3xl font-bold text-emerald-600">0</div></div>
+                    <div class="p-4 rounded border border-slate-200 text-center"><div class="text-sm text-slate-500">Closed Ports</div><div id="closedCount" class="text-3xl font-bold text-slate-700">0</div></div>
+                    <div class="p-4 rounded border border-slate-200 text-center">
+                        <div class="text-sm text-slate-500">Filtered Ports</div>
+                        <div id="filteredCount" class="text-3xl font-bold text-amber-600">0</div>
+                    </div>
+                    <div class="p-4 rounded border border-slate-200 text-center">
+                        <div class="text-sm text-slate-500">Progress</div>
+                        <div class="text-3xl font-bold text-sky-600"><span id="progressPct">0</span>%</div>
+                        <div class="text-xs text-slate-500 mt-1"><span id="progressDone">0</span> / <span id="progressTotal">0</span></div>
                     </div>
                 </div>
-
-                <div id="vulnResultsArea" class="lg:col-span-2 hidden">
-                    <h3 class="font-semibold mb-2">Vulnerability Results</h3>
-                    <div id="vulnResultsBody" class="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div id="targetsTableDiv" class="lg:col-span-2">
+                        <h3 class="font-semibold text-slate-700 mb-2">Targets</h3>
+                        <div class="rounded border border-slate-200 max-h-96 overflow-y-auto custom-scrollbar">
+                            <table id="targetsTable" class="w-full text-sm table-auto">
+                                <thead class="text-slate-500 small sticky top-0 bg-slate-50 z-10">
+                                    <tr>
+                                        <th class="p-2 text-center w-12">#</th>
+                                        <th class="p-2 text-left">Target</th>
+                                        <th class="p-2 text-left">Open Ports</th>
+                                        <th class="p-2 text-left">Closed Ports</th>
+                                        <th class="p-2 text-left">Filtered Ports</th>
+                                        <th class="p-2 text-left">Elapsed</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="targetsBody" class="mono small divide-y divide-slate-100"></tbody>
+                            </table>
                         </div>
+                    </div>
+                    <div id="vulnResultsArea" class="lg:col-span-2 hidden">
+                        <h3 class="font-semibold text-slate-700 mb-2">Vulnerability Results</h3>
+                        <div id="vulnResultsBody" class="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                        </div>
+                    </div>
+                    <div id="topPortsDiv">
+                        <h3 class="font-semibold text-slate-700 mb-2">Top Open Ports</h3>
+                        <div class="p-2 rounded border border-slate-200"><canvas id="topPortsChart" height="200"></canvas></div>
+                        <h3 class="font-semibold text-slate-700 mt-4 mb-2">Realtime Log</h3>
+                        <div id="log" class="mono text-xs p-3 rounded max-h-48 overflow-y-auto small text-slate-600 border border-slate-200 custom-scrollbar bg-slate-50"></div>
+                    </div>
                 </div>
-                <div id="topPortsDiv">
-                    <h3 class="font-semibold mb-2">Top Open Ports</h3>
-                    <canvas id="topPortsChart" height="200"></canvas>
-                    <h3 class="font-semibold mt-4 mb-2">Realtime Log</h3>
-                    <div id="log" class="mono text-xs p-3 rounded max-h-48 overflow-y-auto small text-slate-700 custom-scrollbar"></div>
+            </section>
+        </main>
+    </div>
+
+    <div id="tabContentHistory" class="tab-content">
+      <section class="card rounded-lg p-5 shadow-sm">
+        <h2 class="font-semibold text-slate-700 mb-3">Lịch sử Quét</h2>
+        <div class="flex flex-wrap gap-4 items-end mb-4">
+          <div>
+            <label for="startDate" class="small text-slate-600 block mb-1">Từ ngày</label>
+            <input type="date" id="startDate" class="p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+          </div>
+          <div>
+            <label for="endDate" class="small text-slate-600 block mb-1">Đến ngày</label>
+            <input type="date" id="endDate" class="p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+          </div>
+          <button id="filterHistoryBtn" class="p-2 bg-sky-500 text-white rounded hover:bg-sky-600 transition-colors">Lọc</button>
+          <button id="clearFilterBtn" class="p-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 transition-colors">Xóa lọc</button>
+        </div>
+        <div class="rounded border border-slate-200 max-h-[60vh] overflow-y-auto custom-scrollbar">
+          <table id="historyTable" class="w-full text-sm table-auto">
+            <thead class="text-slate-500 small sticky top-0 bg-slate-50 z-10">
+              <tr>
+                <th class="p-2 text-left">Thời gian</th>
+                <th class="p-2 text-left">Mục tiêu</th>
+                <th class="p-2 text-left">Cổng Mở</th>
+                <th class="p-2 text-left">Cổng Đóng</th>
+                <th class="p-2 text-left">Cổng Lọc/Khác</th>
+                <th class="p-2 text-left">Lỗ hổng/Lỗi</th>
+                <th class="p-2 text-left">Banners</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody" class="mono small divide-y divide-slate-100">
+              </tbody>
+          </table>
+        </div>
+         <div id="historyLoading" class="text-center p-4 text-slate-500 hidden">Đang tải lịch sử...</div>
+         <div id="historyEmpty" class="text-center p-4 text-slate-500 hidden">Không tìm thấy bản ghi nào.</div>
+      </section>
+    </div>
+
+    <div id="tabContentStats" class="tab-content">
+        <section class="card rounded-lg p-5 shadow-sm">
+            <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                <h2 class="font-semibold text-slate-700">Thống kê Quét</h2>
+                <div class="flex gap-2" id="statsFilterButtons">
+                    <button class="stat-filter-btn active" data-days="7">7 Ngày qua</button>
+                    <button class="stat-filter-btn" data-days="30">30 Ngày qua</button>
+                    <button class="stat-filter-btn" data-days="9999">Tất cả</button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-4 items-end mb-4 pb-4 border-b border-slate-200">
+                <div>
+                    <label for="statsStartDate" class="small text-slate-600 block mb-1">Từ ngày</label>
+                    <input type="date" id="statsStartDate" class="p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 small">
+                </div>
+                <div>
+                    <label for="statsEndDate" class="small text-slate-600 block mb-1">Đến ngày</label>
+                    <input type="date" id="statsEndDate" class="p-2 rounded border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 small">
+                </div>
+                <button id="statsFilterBtn" class="p-2 bg-sky-500 text-white rounded hover:bg-sky-600 transition-colors">Lọc</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="p-4 rounded border border-slate-200 text-center">
+                    <div class="text-sm text-slate-500">Tổng số lần quét</div>
+                    <div id="statTotalScans" class="text-3xl font-bold text-sky-600">0</div>
+                </div>
+                <div class="p-4 rounded border border-slate-200 text-center">
+                    <div class="text-sm text-slate-500">Mục tiêu Duy nhất</div>
+                    <div id="statUniqueTargets" class="text-3xl font-bold text-sky-600">0</div>
+                </div>
+                <div class="p-4 rounded border border-slate-200 text-center">
+                    <div class="text-sm text-slate-500">Tổng Cổng Mở</div>
+                    <div id="statTotalOpenPorts" class="text-3xl font-bold text-emerald-600">0</div>
+                </div>
+                <div class="p-4 rounded border border-slate-200 text-center">
+                    <div class="text-sm text-slate-500">Tổng Lỗ hổng</div>
+                    <div id="statTotalVulns" class="text-3xl font-bold text-red-600">0</div>
+                </div>
+            </div>
+
+            <div id="statsLoading" class="text-center p-4 text-slate-500 hidden">Đang tải dữ liệu thống kê...</div>
+            <div id="statsEmpty" class="text-center p-4 text-slate-500 hidden">Không có dữ liệu để thống kê.</div>
+
+            <div id="statsChartsContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="card rounded-lg p-4 shadow-sm border border-slate-200">
+                    <h3 class="font-semibold text-slate-700 mb-2">Top 10 Cổng Mở Phổ Biến</h3>
+                    <canvas id="statsTopPortsChart"></canvas>
+                </div>
+                <div class="card rounded-lg p-4 shadow-sm border border-slate-200">
+                    <h3 class="font-semibold text-slate-700 mb-2">Top 10 Mục tiêu (theo Cổng Mở)</h3>
+                    <canvas id="statsTopTargetsChart"></canvas>
+                </div>
+                <div class="card rounded-lg p-4 shadow-sm border border-slate-200">
+                    <h3 class="font-semibold text-slate-700 mb-2">Top 10 Lỗ hổng Phổ Biến</h3>
+                    <canvas id="statsTopVulnsChart"></canvas>
+                </div>
+                <div class="card rounded-lg p-4 shadow-sm border border-slate-200">
+                    <h3 class="font-semibold text-slate-700 mb-2">Hoạt động Quét</h3>
+                    <canvas id="statsScanActivityChart"></canvas>
                 </div>
             </div>
         </section>
-    </main>
-    
+    </div>
+    </div>
+
+  <div id="historyExportModal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 z-40 flex items-center justify-center p-4">
+    <div class="card rounded-lg p-5 shadow-xl w-full max-w-md">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-semibold text-slate-800">Export Report</h3>
+        <button id="closeModalBtn" type="button" class="text-3xl leading-none text-slate-500 hover:text-slate-800">&times;</button>
+      </div>
+      <p class="small text-slate-600 mb-2">
+        Đang export báo cáo cho target: <strong id="modalTarget" class="mono text-slate-900"></strong>
+      </p>
+      <p class="small text-slate-600 mb-4">
+        Thời gian quét: <strong id="modalTimestamp" class="mono text-slate-900"></strong>
+      </p>
+      <div class="flex gap-2">
+        <button id="modalExportJsonBtn" type="button" class="flex-1 p-2 bg-sky-500 text-white rounded hover:bg-sky-600 transition-colors">Export JSON</button>
+        <button id="modalExportCsvBtn" type="button" class="flex-1 p-2 bg-slate-100 text-slate-700 rounded border border-slate-300 hover:bg-slate-200 transition-colors">Export CSV</button>
+      </div>
+    </div>
   </div>
-  <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-emerald-600 text-white py-2 px-5 rounded-lg shadow-xl transition-opacity duration-500 z-50"></div>
+
+  <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white py-2 px-5 rounded-lg shadow-xl transition-opacity duration-500 z-50"></div>
 
 <script>
 (() => {
   let ws = null, scanning = false, results = [], scanStartTimestamp = 0;
+  let allHistoryData = []; 
+  let selectedHistoryRecord = null;
   const wsPath = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/scan`;
 
-  
+  let charts = {
+      topPorts: null,
+      topTargets: null,
+      topVulns: null,
+      scanActivity: null
+  };
+
   const els = {
+    // Scan Tab
     modeSelect: document.getElementById('modeSelect'), singleBlock: document.getElementById('singleBlock'), bulkBlock: document.getElementById('bulkBlock'),
     targetInput: document.getElementById('targetInput'), ipRangeInput: document.getElementById('ipRangeInput'), cidrInput: document.getElementById('cidrInput'),
-    portsInput: document.getElementById('portsInput'), 
-    protocolDiv: document.getElementById('protocolDiv'), 
+    portsInput: document.getElementById('portsInput'),
+    protocolDiv: document.getElementById('protocolDiv'),
     protocolInput: document.getElementById('protocolInput'),
     scanTypeBlock: document.getElementById('scanTypeBlock'),
     scanTypeInput: document.getElementById('scanTypeInput'),
@@ -109,33 +303,489 @@
     exportCsvBtn: document.getElementById('exportCsvBtn'), exportJsonBtn: document.getElementById('exportJsonBtn'),
     openCount: document.getElementById('openCount'), closedCount: document.getElementById('closedCount'), progressPct: document.getElementById('progressPct'),
     filteredCount: document.getElementById('filteredCount'),
+    progressDone: document.getElementById('progressDone'),
+    progressTotal: document.getElementById('progressTotal'),
     targetsBody: document.getElementById('targetsBody'), log: document.getElementById('log'), toast: document.getElementById('toast'),
     targetsTableDiv: document.getElementById('targetsTableDiv'),
     topPortsDiv: document.getElementById('topPortsDiv'),
     vulnResultsArea: document.getElementById('vulnResultsArea'),
     vulnResultsBody: document.getElementById('vulnResultsBody'),
+
+    // History Tab Elements
+    tabBtnScan: document.getElementById('tabBtnScan'), tabBtnHistory: document.getElementById('tabBtnHistory'),
+    tabContentScan: document.getElementById('tabContentScan'), tabContentHistory: document.getElementById('tabContentHistory'),
+    startDate: document.getElementById('startDate'), endDate: document.getElementById('endDate'),
+    filterHistoryBtn: document.getElementById('filterHistoryBtn'), clearFilterBtn: document.getElementById('clearFilterBtn'),
+    historyTable: document.getElementById('historyTable'), historyBody: document.getElementById('historyBody'),
+    historyLoading: document.getElementById('historyLoading'), historyEmpty: document.getElementById('historyEmpty'),
+
+    // Modal Elements
+    historyExportModal: document.getElementById('historyExportModal'),
+    closeModalBtn: document.getElementById('closeModalBtn'),
+    modalTarget: document.getElementById('modalTarget'),
+    modalTimestamp: document.getElementById('modalTimestamp'),
+    modalExportJsonBtn: document.getElementById('modalExportJsonBtn'),
+    modalExportCsvBtn: document.getElementById('modalExportCsvBtn'),
+
+    // Stats Tab Elements
+    tabBtnStats: document.getElementById('tabBtnStats'),
+    tabContentStats: document.getElementById('tabContentStats'),
+    statsFilterButtons: document.getElementById('statsFilterButtons'),
+    statsStartDate: document.getElementById('statsStartDate'),
+    statsEndDate: document.getElementById('statsEndDate'),
+    statsFilterBtn: document.getElementById('statsFilterBtn'),
+    statTotalScans: document.getElementById('statTotalScans'),
+    statUniqueTargets: document.getElementById('statUniqueTargets'),
+    statTotalOpenPorts: document.getElementById('statTotalOpenPorts'),
+    statTotalVulns: document.getElementById('statTotalVulns'),
+    statsLoading: document.getElementById('statsLoading'),
+    statsEmpty: document.getElementById('statsEmpty'),
+    statsChartsContainer: document.getElementById('statsChartsContainer')
   };
 
   const topChart = new Chart(document.getElementById('topPortsChart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#0ea5a4' }] }, options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } });
 
-  const showToast = (message, duration = 3000) => { els.toast.textContent = message; els.toast.classList.remove('hidden'); setTimeout(() => els.toast.classList.add('hidden'), duration); };
+  const showToast = (message, isError = false, duration = 3000) => {
+      els.toast.textContent = message;
+      els.toast.className = `fixed bottom-5 left-1/2 -translate-x-1/2 text-white py-2 px-5 rounded-lg shadow-xl transition-opacity duration-500 z-50 ${isError ? 'bg-red-600' : 'bg-slate-800'}`;
+      els.toast.classList.remove('hidden');
+      setTimeout(() => els.toast.classList.add('hidden'), duration);
+  };
+
   const formatElapsed = ts => { const s = Math.floor(Date.now()/1000 - ts); return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`; };
 
+  const escapeHTML = (str) => {
+      if (str == null) return '';
+      if (typeof str !== 'string') return String(str);
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
 
-  const escapeHTML = (str) => str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const cleanBannerText = (text) => {
+     if (typeof text !== 'string') return text;
+     return text.replace(/[^\x20-\x7E\t\n\r]/g, '');
+  };
 
   const addLog = line => {
     const el = document.createElement('div');
-    el.textContent = `[${new Date().toLocaleTimeString()}] ${line}`;
+    el.textContent = `[${new Date().toLocaleTimeString('en-GB')}] ${line}`;
     els.log.appendChild(el);
     els.log.scrollTop = els.log.scrollHeight;
   };
+
+  const exportData = (content, type, filename) => {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+  };
+
+  window.switchTab = (tabId) => {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+    document.getElementById(`tabContent${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`).classList.add('active');
+    document.getElementById(`tabBtn${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`).classList.add('active');
+
+    if (tabId === 'history') {
+      loadHistory();
+    } else if (tabId === 'stats') {
+      loadStats();
+    }
+  }
+
+  const fetchHistoryData = async () => {
+      allHistoryData = []; 
+      addLog('Đang tải lịch sử quét...');
+      try {
+          const response = await fetch(`/results/summary.jsonl?t=${new Date().getTime()}`);
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const text = await response.text();
+          allHistoryData = text.split('\n')
+                              .filter(line => line.trim() !== '')
+                              .map(line => {
+                                  try { return JSON.parse(line); } catch (e) {
+                                      console.error('Failed to parse history line:', line, e); return null;
+                                  }
+                              })
+                              .filter(item => item !== null && item.ts && item.target)
+                              .sort((a, b) => b.ts - a.ts);
+          addLog(`Đã tải ${allHistoryData.length} mục lịch sử.`);
+          return true;
+      } catch (e) {
+          console.error('Failed to load history:', e);
+          addLog(`Lỗi khi tải lịch sử: ${e.message}`);
+          return e.message;
+      }
+  };
+
+  const filterDataByDays = (days) => {
+      const now = new Date();
+      const cutoff = new Date();
+      cutoff.setDate(now.getDate() - days);
+      const cutoffTs = Math.floor(cutoff.getTime() / 1000);
+
+      if (days >= 9999) return allHistoryData; 
+      return allHistoryData.filter(record => record.ts >= cutoffTs);
+  };
+
+  const deselectQuickFilters = () => {
+      els.statsFilterButtons.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+  };
+
+  const loadStats = async () => {
+      els.statsLoading.classList.remove('hidden');
+      els.statsEmpty.classList.add('hidden');
+      els.statsChartsContainer.classList.add('hidden');
+      els.statTotalScans.textContent = '0';
+      els.statUniqueTargets.textContent = '0';
+      els.statTotalOpenPorts.textContent = '0';
+      els.statTotalVulns.textContent = '0';
+
+      Object.values(charts).forEach(chart => chart?.destroy());
+
+
+      const dataLoaded = await fetchHistoryData();
+      if (dataLoaded !== true) {
+          els.statsLoading.classList.add('hidden');
+          els.statsEmpty.textContent = `Lỗi khi tải dữ liệu: ${dataLoaded}`;
+          els.statsEmpty.classList.remove('hidden');
+          return;
+      }
+
+      const startStr = els.statsStartDate.value;
+      const endStr = els.statsEndDate.value;
+      let filteredData;
+
+      if (startStr || endStr) {
+          deselectQuickFilters();
+          let startDate = startStr ? new Date(startStr) : null;
+          let endDate = endStr ? new Date(endStr) : null;
+
+          if (startDate) startDate.setHours(0, 0, 0, 0);
+          if (endDate) endDate.setHours(23, 59, 59, 999);
+
+          filteredData = allHistoryData.filter(record => {
+              const recordDate = new Date(record.ts * 1000);
+              if (startDate && recordDate < startDate) return false;
+              if (endDate && recordDate > endDate) return false;
+              return true;
+          });
+      } else {
+          const activeFilter = els.statsFilterButtons.querySelector('.active') || els.statsFilterButtons.querySelector('[data-days="7"]');
+          if (!els.statsFilterButtons.querySelector('.active')) {
+              activeFilter.classList.add('active');
+          }
+          const days = parseInt(activeFilter.dataset.days, 10);
+          filteredData = filterDataByDays(days);
+      }
+
+
+      els.statsLoading.classList.add('hidden');
+      if (filteredData.length === 0) {
+          els.statsEmpty.textContent = 'Không có dữ liệu để thống kê cho khoảng thời gian này.';
+          els.statsEmpty.classList.remove('hidden');
+          return;
+      }
+
+      els.statsChartsContainer.classList.remove('hidden');
+
+      const uniqueTargets = new Set(filteredData.map(r => r.target));
+      const totalOpenPorts = filteredData.reduce((sum, r) => sum + (r.open_ports?.length || 0), 0);
+      const totalVulns = filteredData.reduce((sum, r) => sum + (r.vulnerabilities?.length || 0), 0);
+
+
+      els.statTotalScans.textContent = filteredData.length;
+      els.statUniqueTargets.textContent = uniqueTargets.size;
+      els.statTotalOpenPorts.textContent = totalOpenPorts;
+      els.statTotalVulns.textContent = totalVulns; 
+
+      renderStatsChart('topPorts', 'statsTopPortsChart', filteredData, getTopOpenPortsData, 'bar', 'Top Cổng Mở');
+      renderStatsChart('topTargets', 'statsTopTargetsChart', filteredData, getTopTargetsData, 'bar', 'Top Mục tiêu', { indexAxis: 'y' });
+      renderStatsChart('topVulns', 'statsTopVulnsChart', filteredData, getTopVulnsData, 'bar', 'Top Lỗ hổng'); // Sửa ở hàm getTopVulnsData
+      renderStatsChart('scanActivity', 'statsScanActivityChart', filteredData, getScanActivityData, 'line', 'Hoạt động Quét', {
+          scales: {
+              x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd/MM/yyyy' }, title: { display: true, text: 'Ngày' } }
+          }
+      });
+  };
+
+  const renderStatsChart = (chartKey, canvasId, data, dataFunc, type, label, extraOptions = {}) => {
+      const { labels, values } = dataFunc(data);
+      charts[chartKey] = new Chart(document.getElementById(canvasId).getContext('2d'), {
+          type: type,
+          data: {
+              labels: labels,
+              datasets: [{
+                  label: label,
+                  data: values,
+                  backgroundColor: type === 'line' ? 'rgba(14, 165, 233, 0.1)' : 'rgba(14, 165, 233, 0.6)',
+                  borderColor: '#0ea5e9',
+                  borderWidth: 2,
+                  fill: type === 'line',
+                  tension: 0.1
+              }]
+          },
+          options: {
+              responsive: true,
+              plugins: { legend: { display: false } },
+              ...extraOptions
+          }
+      });
+  };
+
+  const getTopOpenPortsData = (data) => {
+      const counts = {};
+      data.forEach(r => {
+          r.open_ports?.forEach(port => {
+              counts[port] = (counts[port] || 0) + 1;
+          });
+      });
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      return { labels: sorted.map(e => e[0]), values: sorted.map(e => e[1]) };
+  };
+
+  const getTopTargetsData = (data) => {
+      const counts = {};
+      data.forEach(r => {
+          counts[r.target] = (counts[r.target] || 0) + (r.open_ports?.length || 0);
+      });
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      return { labels: sorted.map(e => e[0]), values: sorted.map(e => e[1]) };
+  };
+
+  const getTopVulnsData = (data) => {
+      const counts = {}; 
+      data.forEach(r => {
+          r.vulnerabilities?.forEach(vuln => {
+              const key = `${vuln.script_id} (${vuln.port})`;
+              counts[key] = (counts[key] || 0) + 1;
+          });
+      });
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      return { labels: sorted.map(e => e[0]), values: sorted.map(e => e[1]) };
+  };
+
+
+  const getScanActivityData = (data) => {
+      const counts = {}; 
+      data.forEach(r => {
+          const date = new Date(r.ts * 1000).toISOString().split('T')[0];
+          counts[date] = (counts[date] || 0) + 1;
+      });
+      const sorted = Object.entries(counts).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+      return { labels: sorted.map(e => e[0]), values: sorted.map(e => e[1]) };
+  };
+
+  els.statsFilterButtons.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') {
+          els.statsFilterButtons.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+          e.target.classList.add('active');
+
+          els.statsStartDate.value = '';
+          els.statsEndDate.value = '';
+
+          allHistoryData = []; 
+          loadStats();
+      }
+  });
+
+  els.statsFilterBtn.addEventListener('click', () => {
+      allHistoryData = [];
+      loadStats();
+  });
+  els.statsStartDate.addEventListener('change', deselectQuickFilters);
+  els.statsEndDate.addEventListener('change', deselectQuickFilters);
+
+  const loadHistory = async () => {
+    els.historyLoading.classList.remove('hidden');
+    els.historyEmpty.classList.add('hidden');
+    els.historyBody.innerHTML = '';
+
+    const dataLoaded = await fetchHistoryData();
+    if (dataLoaded !== true) {
+        els.historyLoading.classList.add('hidden');
+        els.historyEmpty.textContent = `Lỗi khi tải dữ liệu: ${dataLoaded}`;
+        els.historyEmpty.classList.remove('hidden');
+        return;
+    }
+
+    const startStr = els.startDate.value;
+    const endStr = els.endDate.value;
+    let startDate = null;
+    let endDate = null;
+
+    if (startStr) {
+        startDate = new Date(startStr);
+        startDate.setHours(0, 0, 0, 0);
+    }
+    if (endStr) {
+        endDate = new Date(endStr);
+        endDate.setHours(23, 59, 59, 999);
+    }
+
+    const filteredData = allHistoryData.filter(record => {
+        const recordDate = new Date(record.ts * 1000);
+        if (startDate && recordDate < startDate) return false;
+        if (endDate && recordDate > endDate) return false;
+        return true;
+    });
+
+    els.historyLoading.classList.add('hidden');
+    if (filteredData.length === 0) {
+        els.historyEmpty.classList.remove('hidden');
+    } else {
+        filteredData.forEach(record => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors';
+
+            tr.style.cursor = 'pointer';
+            tr.title = 'Click để export báo cáo cho lần quét này';
+            tr.addEventListener('click', () => openHistoryModal(record));
+
+            const ts = record.ts ? new Date(record.ts * 1000).toLocaleString('vi-VN') : 'N/A';
+            const target = escapeHTML(record.target || 'N/A');
+            const openPorts = escapeHTML(record.open_ports?.join(', ') || '-');
+            const closedPorts = escapeHTML(record.closed_ports?.join(', ') || '-');
+
+            let otherPorts = [...(record.filtered_ports || []), ...(record.unfiltered_ports || []), ...(record.open_filtered_ports || [])].join(', ');
+            otherPorts = escapeHTML(otherPorts || '-');
+
+            let vulnErrorHtml = '-';
+            if (record.error) {
+                vulnErrorHtml = `<span class="text-red-600">Lỗi: ${escapeHTML(record.error)}</span>`;
+            } else if (record.vulnerabilities && record.vulnerabilities.length > 0) {
+                vulnErrorHtml = '<div class="space-y-1">';
+                record.vulnerabilities.forEach(v => {
+                    const scriptId = escapeHTML(v.script_id);
+                    const port = escapeHTML(v.port);
+                    const service = escapeHTML(v.service || 'unknown');
+                    const outputContent = escapeHTML(v.output); 
+
+                    let titleColor = 'text-yellow-700';
+                     if (v.output?.toLowerCase().includes('vulnerable') || v.output?.toLowerCase().includes('exploit')) {
+                        titleColor = 'text-red-700';
+                    }
+
+                    vulnErrorHtml += `
+                        <div class="p-1 border-l-2 border-slate-200 pl-2">
+                            <div class="font-bold ${titleColor} small">${scriptId} (${port})</div>
+                            <div class="mono text-xs text-slate-500">${service}</div>
+                            ${outputContent ? `<pre class="mono text-xs text-slate-600 mt-1">${outputContent}</pre>` : ''}
+                        </div>
+                    `;
+                });
+                vulnErrorHtml += '</div>';
+            }
+
+            let bannersHtml = '-';
+            if (record.banners && Object.keys(record.banners).length > 0) {
+                bannersHtml = Object.entries(record.banners)
+                    .map(([port, banner]) => {
+                        const cleanedBanner = cleanBannerText(banner);
+                        return `<div><strong>${escapeHTML(port)}:</strong> ${escapeHTML(cleanedBanner)}</div>`;
+                    })
+                    .join('');
+            }
+
+            tr.innerHTML = `
+              <td class="p-2 align-top">${ts}</td>
+              <td class="p-2 align-top break-all">${target}</td>
+              <td class="p-2 align-top break-all">${openPorts}</td>
+              <td class="p-2 align-top break-all">${closedPorts}</td>
+              <td class="p-2 align-top break-all">${otherPorts}</td>
+              <td class="p-2 align-top break-words">${vulnErrorHtml}</td>
+              <td class="p-2 align-top history-banner">${bannersHtml}</td>
+            `;
+            els.historyBody.appendChild(tr);
+        });
+    }
+  };
+
+  els.filterHistoryBtn.addEventListener('click', () => {
+      allHistoryData = [];
+      loadHistory();
+  });
+  els.clearFilterBtn.addEventListener('click', () => {
+      els.startDate.value = '';
+      els.endDate.value = '';
+      allHistoryData = [];
+      loadHistory();
+  });
+
+  const openHistoryModal = (record) => {
+    selectedHistoryRecord = record;
+    els.modalTarget.textContent = record.target;
+
+    const timestamp = record.ts ? new Date(record.ts * 1000).toLocaleString('vi-VN') : 'N/A';
+    els.modalTimestamp.textContent = timestamp;
+
+    els.historyExportModal.classList.remove('hidden');
+  };
+
+  const closeHistoryModal = () => {
+    selectedHistoryRecord = null;
+    els.historyExportModal.classList.add('hidden');
+  };
+
+  const exportModalJSON = () => {
+    if (!selectedHistoryRecord) return;
+    const filename = `scan_report_${selectedHistoryRecord.target}_${selectedHistoryRecord.ts}.json`;
+    exportData(JSON.stringify(selectedHistoryRecord, null, 2), 'application/json', filename);
+    closeHistoryModal();
+  };
+
+  const exportModalCSV = () => {
+    if (!selectedHistoryRecord) return;
+    const r = selectedHistoryRecord;
+
+    const header = ['target', 'timestamp', 'open_ports', 'closed_ports', 'filtered_ports', 'other_ports', 'error', 'vulnerabilities_details'];
+
+    const otherPorts = [...(r.unfiltered_ports || []), ...(r.open_filtered_ports || [])].join(';');
+
+    let vulnerabilitiesDetails = '';
+    if (r.vulnerabilities && r.vulnerabilities.length > 0) {
+        vulnerabilitiesDetails = r.vulnerabilities.map(v => {
+            return `${v.script_id}(${v.port}|${v.service || ''})`;
+        }).join('; ');
+    }
+
+    const row = [
+      r.target,
+      new Date(r.ts * 1000).toLocaleString('vi-VN'),
+      r.open_ports?.join(';') || '',
+      r.closed_ports?.join(';') || '',
+      r.filtered_ports?.join(';') || '',
+      otherPorts,
+      r.error || '',
+      vulnerabilitiesDetails
+    ];
+
+    const csv = [header, row].map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const filename = `scan_report_${r.target}_${r.ts}.csv`;
+    exportData(csv, 'text/csv', filename);
+    closeHistoryModal();
+  };
+
+
+  els.closeModalBtn.addEventListener('click', closeHistoryModal);
+  els.historyExportModal.addEventListener('click', (e) => {
+    if (e.target === els.historyExportModal) closeHistoryModal();
+  });
+  els.modalExportJsonBtn.addEventListener('click', exportModalJSON);
+  els.modalExportCsvBtn.addEventListener('click', exportModalCSV);
 
   const updateUI = (data) => {
     if (data.status === 'running') {
       if (data.open_ports !== undefined) els.openCount.textContent = data.open_ports;
       if (data.closed_ports !== undefined) els.closedCount.textContent = data.closed_ports;
       if (data.filtered_ports_total !== undefined) els.filteredCount.textContent = data.filtered_ports_total;
+
+      els.progressDone.textContent = data.progress_done;
+      els.progressTotal.textContent = data.progress_total;
+
       const pct = (data.progress_total > 0) ? Math.round((data.progress_done / data.progress_total) * 100) : 0;
       els.progressPct.textContent = Math.min(100, pct);
     }
@@ -149,61 +799,57 @@
 
     if (data.new_vuln_result) {
         const res = data.new_vuln_result;
-        const target = res.target;
+        const target = escapeHTML(res.target);
         const vulns = res.vulnerabilities || [];
-        const error = res.error; 
+        const error = res.error ? escapeHTML(res.error) : null;
 
         let targetDiv = els.vulnResultsBody.querySelector(`div[data-target="${target}"]`);
         if (!targetDiv) {
             targetDiv = document.createElement('div');
             targetDiv.dataset.target = target;
             targetDiv.className = 'mb-4';
-            targetDiv.innerHTML = `<h4 class="font-semibold text-base mb-2 p-2 bg-slate-100 rounded">${escapeHTML(target)}</h4><div class="vuln-list space-y-2"></div>`;
+            targetDiv.innerHTML = `<h4 class="font-semibold text-base mb-2 p-2 bg-slate-100 rounded border border-slate-200">${target}</h4><div class="vuln-list space-y-2"></div>`;
             els.vulnResultsBody.appendChild(targetDiv);
         }
-
         const listDiv = targetDiv.querySelector('.vuln-list');
-        listDiv.innerHTML = ''; 
-
+        listDiv.innerHTML = '';
 
         if (error) {
-            listDiv.innerHTML = `<div class="p-3 rounded border bg-red-50 border-red-200 text-red-700 small">
-                                     <span class="font-bold">Scan Error:</span> ${escapeHTML(error)}
-                                 </div>`;
+            listDiv.innerHTML = `<div class="p-3 rounded border bg-red-50 border-red-200 text-red-700 small"><span class="font-bold">Scan Error:</span> ${error}</div>`;
             addLog(`Target: ${target} | Scan FAILED: ${error}`);
-        
         } else if (vulns.length === 0) {
             listDiv.innerHTML = `<div class="p-3 rounded border bg-green-50 border-green-200 text-green-700 small">✅ Không tìm thấy lỗ hổng (dựa trên script 'vuln' của Nmap).</div>`;
             addLog(`Target: ${target} | Vulnerabilities processed: 0`);
-        
         } else {
             vulns.forEach(v => {
               const vulnEl = document.createElement('div');
-              let bgColor = 'bg-red-50';
-              let borderColor = 'border-red-200';
-              let titleColor = 'text-red-700'; 
+              const scriptId = escapeHTML(v.script_id);
+              const port = escapeHTML(v.port);
+              const service = escapeHTML(v.service_info || v.service || 'unknown');
+              const output = escapeHTML(v.output);
 
-              if (v.script_id.startsWith("ERROR:")) {
-                  bgColor = 'bg-yellow-50'; 
-                  borderColor = 'border-yellow-200';
-                  titleColor = 'text-yellow-700';
+              let bgColor = 'bg-yellow-50';
+              let borderColor = 'border-yellow-200';
+              let titleColor = 'text-yellow-700';
+
+              if (output.toLowerCase().includes('vulnerable') || output.toLowerCase().includes('exploit')) {
+                  bgColor = 'bg-red-50';
+                  borderColor = 'border-red-200';
+                  titleColor = 'text-red-700';
               }
 
               vulnEl.className = `p-3 rounded border ${bgColor} ${borderColor}`;
-              const escapedOutput = escapeHTML(v.output);
-
               vulnEl.innerHTML = `
-                  <div class="font-bold ${titleColor} small">${escapeHTML(v.script_id)} (${escapeHTML(v.port)})</div>
-                  <div class="mono text-xs text-slate-700 mt-1">${escapeHTML(v.service)}</div>
-                  <pre class="mono text-xs text-slate-900 mt-2 p-2 bg-white rounded overflow-x-auto custom-scrollbar">${escapedOutput}</pre>
+                  <div class="font-bold ${titleColor} small">${scriptId} (${port})</div>
+                  <div class="mono text-xs text-slate-700 mt-1">${service}</div>
+                  <pre class="mono text-xs text-slate-900 mt-2 p-2 bg-white rounded overflow-x-auto custom-scrollbar border border-slate-200 vuln-output-pre">${output || 'No output'}</pre>
               `;
               listDiv.appendChild(vulnEl);
           });
-            addLog(`Target: ${target} | Vulnerabilities processed: ${vulns.length}`);
+            addLog(`Target: ${target} | Vulnerability scripts processed: ${vulns.length}`);
         }
-        
     }
-    
+
 
     if (data.new_result_line) {
         addLog(data.new_result_line);
@@ -228,7 +874,7 @@
             if (!tr) {
                 tr = document.createElement('tr');
                 tr.dataset.target = target;
-                tr.className = 'border-b border-slate-200 last:border-b-0';
+                tr.className = 'border-b border-slate-100 last:border-b-0 hover:bg-slate-50'; // Style mới
                 els.targetsBody.appendChild(tr);
             }
 
@@ -247,14 +893,14 @@
 
   const resetState = () => {
     results = []; scanStartTimestamp = 0;
-    ['openCount', 'closedCount', 'progressPct', 'filteredCount'].forEach(id => els[id].textContent = '0');
+    ['openCount', 'closedCount', 'progressPct', 'filteredCount', 'progressDone', 'progressTotal'].forEach(id => els[id].textContent = '0');
     els.targetsBody.innerHTML = ''; els.log.innerHTML = '';
 
-    els.vulnResultsBody.innerHTML = ''; 
-    els.vulnResultsArea.classList.add('hidden'); 
-  
-    els.targetsTableDiv.classList.remove('hidden'); 
-    els.topPortsDiv.classList.remove('hidden'); 
+    els.vulnResultsBody.innerHTML = '';
+    els.vulnResultsArea.classList.add('hidden');
+
+    els.targetsTableDiv.classList.remove('hidden');
+    els.topPortsDiv.classList.remove('hidden');
     els.protocolInput.disabled = false;
     els.protocolDiv.classList.remove('hidden');
     updateProtocolVisibility();
@@ -262,13 +908,29 @@
     topChart.data.labels = []; topChart.data.datasets[0].data = []; topChart.update();
   };
 
-  const stopScan = (message) => {
+  const stopScan = (message, isError = false) => {
     addLog(message);
     scanning = false;
     els.startBtn.disabled = false;
     els.stopBtn.disabled = true;
+
+    allHistoryData = []; 
+    if (els.tabContentHistory.classList.contains('active')) {
+         setTimeout(loadHistory, 1000);
+    }
+    if (els.tabContentStats.classList.contains('active')) {
+         setTimeout(loadStats, 1000);
+    }
+
+    if (message.includes('finished')) {
+        showToast('Scan finished successfully! ✅');
+    } else if (isError) {
+        showToast(message, true);
+    } else {
+        showToast(message, false, 2000);
+    }
   };
-  
+
   els.modeSelect.addEventListener('change', () => {
     const isBulk = els.modeSelect.value === 'bulk';
     els.singleBlock.classList.toggle('hidden', isBulk);
@@ -284,19 +946,19 @@
   const updateProtocolVisibility = () => {
       const scanType = els.scanTypeInput.value;
       if (scanType === 'vuln') {
-          els.protocolInput.value = 'tcp'; 
-          els.protocolDiv.classList.add('hidden'); 
+          els.protocolInput.value = 'tcp';
+          els.protocolDiv.classList.add('hidden');
       } else {
-          els.protocolDiv.classList.remove('hidden'); 
+          els.protocolDiv.classList.remove('hidden');
       }
   };
 
   els.protocolInput.addEventListener('change', updateScanTypeVisibility);
   els.scanTypeInput.addEventListener('change', () => {
       updateProtocolVisibility();
-      updateScanTypeVisibility(); 
+      updateScanTypeVisibility();
   });
-  
+
 
   updateScanTypeVisibility();
   updateProtocolVisibility();
@@ -311,11 +973,12 @@
     else { payload.ip_range = els.ipRangeInput.value.trim(); payload.cidr = els.cidrInput.value.trim(); }
 
     if ((payload.mode === 'single' && !payload.target) || (payload.mode === 'bulk' && !payload.ip_range && !payload.cidr)) {
+        showToast('Target/Range/CIDR is required.', true);
       return addLog('Target/Range/CIDR is required.');
     }
-    
+
     resetState();
-    
+
     if (payload.scan_type === 'vuln') {
         els.targetsTableDiv.classList.add('hidden');
         els.topPortsDiv.classList.add('hidden');
@@ -326,34 +989,27 @@
     ws = new WebSocket(wsPath);
 
     ws.onopen = () => { addLog('WebSocket connected. Starting scan...'); ws.send(JSON.stringify(payload)); scanning = true; els.startBtn.disabled = true; els.stopBtn.disabled = false; };
-    ws.onclose = () => { if (scanning) stopScan('WebSocket closed unexpectedly.'); };
-    ws.onerror = () => stopScan('WebSocket error.');
+    ws.onclose = () => { if (scanning) stopScan('WebSocket closed unexpectedly.', true); };
+    ws.onerror = () => stopScan('WebSocket error.', true);
     ws.onmessage = evt => {
       try {
         const data = JSON.parse(evt.data);
-        if (data.type === 'error') return addLog(`Error: ${data.message}`);
+        if (data.type === 'error') {
+            showToast(`Error: ${data.message}`, true);
+            return addLog(`Error: ${data.message}`);
+        }
         updateUI(data);
         if (data.status === 'done') {
           stopScan('Scan finished.');
           els.progressPct.textContent = '100';
-          showToast('Scan finished successfully! ✅');
         } else if (data.status === 'stopped') {
           stopScan('Scan stopped by user.');
-          showToast('Scan was stopped. 🛑', 2000);
         }
       } catch (e) { console.error('WS parse error', e); addLog('Failed to process message.'); }
     };
   });
 
   els.stopBtn.addEventListener('click', () => { if (ws && scanning) ws.send(JSON.stringify({ command: 'stop' })); });
-
-  const exportData = (content, type, filename) => {
-      const blob = new Blob([content], { type });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
-  };
 
   els.exportCsvBtn.addEventListener('click', () => {
       if (!results.length) return alert('No results to export');
@@ -367,6 +1023,7 @@
       if (!results.length) return alert('No results to export (Port scan data is empty)');
       exportData(JSON.stringify(results, null, 2), 'application/json', 'scan_results.json');
   });
+
 })();
 </script>
 </body>
